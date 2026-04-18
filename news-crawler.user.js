@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.0.5
+// @version      2.0.6
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -94,9 +94,9 @@
           timeout: 15000,
           onload: (r) => {
             if (r.status >= 200 && r.status < 300) resolve(r.responseText);
-            else reject(new Error("HTTP " + r.status));
+            else reject(new Error("HTTP " + r.status + ": " + (r.responseText?.substring(0, 100) || "")));
           },
-          onerror: () => reject(new Error("请求失败")),
+          onerror: (e) => reject(new Error("请求失败: " + (e?.message || "unknown"))),
           ontimeout: () => reject(new Error("请求超时"))
         });
       });
@@ -109,7 +109,10 @@
       const news = [];
       try {
         const p = new DOMParser().parseFromString(data, "text/xml");
-        if (p.querySelector("parsererror")) return news;
+        if (p.querySelector("parsererror")) {
+          console.warn(sourceName + ": XML解析错误");
+          return news;
+        }
         p.querySelectorAll("item, entry").forEach(item => {
           const title = item.querySelector("title")?.textContent?.trim();
           const link = item.querySelector("link")?.getAttribute("href") || item.querySelector("link")?.textContent?.trim() || "";
@@ -175,10 +178,17 @@
         statusEl.textContent = "🔄 抓取中 " + (i + 1) + "/" + allFeeds.length + "...";
         try {
           const data = await Utils.httpReq(feed.url);
+          if (!data || data.length < 10) {
+            console.warn(feed.name + ": 空响应或数据过短");
+            continue;
+          }
           const parsed = Parser.parse(data, feed.name, feed.type || "rss");
+          if (parsed.length === 0) {
+            console.warn(feed.name + ": 解析成功但无新闻，可能RSS格式异常");
+          }
           news.push(...parsed);
           successCount++;
-        } catch (e) { console.warn(feed.name, e.message); }
+        } catch (e) { console.error(feed.name + " 抓取失败:", e.message); }
       }
 
       news.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
