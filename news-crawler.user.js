@@ -106,7 +106,7 @@
 
     fab.addEventListener("click", () => {
       panel.classList.toggle("show");
-      if (panel.classList.contains("show") && !getNews().length) {
+      if (panel.classList.contains("show")) {
         refreshList();
       }
     });
