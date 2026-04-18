@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.0.6
+// @version      2.0.7
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -173,22 +173,36 @@
       let statusEl = UI.getStatusEl();
       statusEl.textContent = "🔄 抓取中 0/" + allFeeds.length + "...";
 
+      const getFallbackTypes = (primaryType) => {
+        const all = ["rss", "json", "webpage"];
+        return all.filter(t => t !== primaryType);
+      };
+
       for (let i = 0; i < allFeeds.length; i++) {
         const feed = allFeeds[i];
         statusEl.textContent = "🔄 抓取中 " + (i + 1) + "/" + allFeeds.length + "...";
-        try {
-          const data = await Utils.httpReq(feed.url);
-          if (!data || data.length < 10) {
-            console.warn(feed.name + ": 空响应或数据过短");
-            continue;
-          }
-          const parsed = Parser.parse(data, feed.name, feed.type || "rss");
-          if (parsed.length === 0) {
-            console.warn(feed.name + ": 解析成功但无新闻，可能RSS格式异常");
-          }
-          news.push(...parsed);
-          successCount++;
-        } catch (e) { console.error(feed.name + " 抓取失败:", e.message); }
+        const primaryType = feed.type || "rss";
+        const types = [primaryType, ...getFallbackTypes(primaryType)];
+        let fetched = false;
+
+        for (const type of types) {
+          try {
+            const data = await Utils.httpReq(feed.url);
+            if (!data || data.length < 10) continue;
+            const parsed = Parser.parse(data, feed.name, type);
+            if (parsed.length > 0) {
+              news.push(...parsed);
+              console.log(feed.name + ": " + type + "成功");
+              fetched = true;
+              successCount++;
+              break;
+            }
+          } catch (e) { continue; }
+        }
+
+        if (!fetched) {
+          console.error(feed.name + ": 所有方式均失败");
+        }
       }
 
       news.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
