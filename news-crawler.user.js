@@ -81,6 +81,7 @@
           <div>新闻条数: <span id="count">0</span></div>
           <div>来源数量: <span id="sources">0</span></div>
           <div>最后更新: <span id="time">-</span></div>
+          <div>导出文件夹: <span id="folderDisplay">新闻日报</span> <button id="editFolderBtn" style="font-size:10px;padding:2px 6px;background:#4a9eff;color:#fff;border:none;border-radius:4px;cursor:pointer">修改</button></div>
         </div>
         <button class="nc-btn primary" id="start">🚀 一键抓取并生成日报</button>
         <button class="nc-btn" id="fetchOnly">🔄 仅抓取新闻</button>
@@ -101,6 +102,7 @@
     sidebar.querySelector("#reportOnly").onclick = makeReport;
     sidebar.querySelector("#op-").onclick = () => changeOpacity(-10);
     sidebar.querySelector("#op+").onclick = () => changeOpacity(10);
+    sidebar.querySelector("#editFolderBtn").onclick = editFolder;
 
     const floatBtn = GM_addElement("div", {
       style: "position:fixed;bottom:20px;right:20px;width:48px;height:48px;background:linear-gradient(135deg,#4a9eff,#6b5bff);border-radius:50%;box-shadow:0 4px 16px rgba(74,158,255,.4);cursor:pointer;z-index:2147483645;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff",
@@ -110,6 +112,7 @@
     document.body.appendChild(floatBtn);
 
     updateStat();
+    updateFolderDisplay();
     sidebar.style.background = `rgba(255,255,255,${opacity/100})`;
     sidebar.querySelector("#op-text").textContent = opacity + "%";
     GM_notification({ title: "📰 新闻日报已就绪", text: "点击按钮开始抓取", silent: true });
@@ -125,6 +128,19 @@
     sidebar.style.background = `rgba(255,255,255,${opacity/100})`;
     sidebar.querySelector("#op-text").textContent = opacity + "%";
     GM_setValue("opacity", opacity);
+  }
+
+  function updateFolderDisplay() {
+    sidebar.querySelector("#folderDisplay").textContent = folder();
+  }
+
+  function editFolder() {
+    const newFolder = prompt("请输入导出文件夹名称:", folder());
+    if (newFolder && newFolder.trim()) {
+      GM_setValue("folder", newFolder.trim());
+      updateFolderDisplay();
+      GM_notification({ title: "已保存", text: `导出文件夹: ${newFolder.trim()}`, silent: true });
+    }
   }
 
   function setStatus(s) { sidebar.querySelector("#status").textContent = s; }
