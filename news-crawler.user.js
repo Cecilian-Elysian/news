@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.0.8
+// @version      2.0.9
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -40,12 +40,23 @@
       { name: "参考消息", url: "http://www.cankaoxiaoxi.com/rss/", type: "rss" },
       { name: "环球时报", url: "http://www.huanqiu.com/rss/", type: "rss" },
       { name: "RadarAI", url: "https://radarai.top/feed.xml", type: "rss" },
+      { name: "微博热搜", url: "https://rsshub.app/weibo/hot", type: "rss" },
+      { name: "知乎热榜", url: "https://rsshub.app/zhihu/hot", type: "rss" },
+      { name: "百度热搜", url: "https://rsshub.app/baidu/hot", type: "rss" },
+      { name: "Bilibili热搜", url: "https://rsshub.app/bilibili/hot", type: "rss" },
+      { name: "抖音热搜", url: "https://rsshub.app/douyin/hot", type: "rss" },
+      { name: "即刻热榜", url: "https://rsshub.app/jike/topic/default", type: "rss" },
+      { name: "GitHub趋势", url: "https://rsshub.app/github/trending", type: "rss" },
+      { name: "ProductHunt", url: "https://rsshub.app/producthunt/today", type: "rss" },
+      { name: "HackerNews", url: "https://rsshub.app/hacker-news/best", type: "rss" },
     ],
     PRIORITY: {
       "人民日报": 10, "新华网": 10, "央视新闻": 10, "澎湃新闻": 8, "观察者网": 8,
       "腾讯新闻": 6, "腾讯科技": 6, "新浪新闻": 6, "网易新闻": 6, "知乎热榜": 7, "36氪": 7, "虎嗅": 7,
       "IT之家": 6, "搜狐新闻": 5, "少数派": 7, "掘金": 7, "凤凰网": 5, "财经网": 5, "第一财经": 5,
-      "参考消息": 6, "环球时报": 6, "RadarAI": 8
+      "参考消息": 6, "环球时报": 6, "RadarAI": 8,
+      "微博热搜": 6, "百度热搜": 6, "Bilibili热搜": 5, "抖音热搜": 5, "即刻热榜": 6,
+      "GitHub趋势": 7, "ProductHunt": 6, "HackerNews": 7
     }
   };
 
