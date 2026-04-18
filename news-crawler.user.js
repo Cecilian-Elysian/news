@@ -137,11 +137,11 @@
   }
 
   function editFolder() {
-    const newFolder = prompt("请输入导出文件夹名称:", folder());
+    const newFolder = prompt("请输入导出文件夹路径:\n(例如: D:\\新闻日报 或 /Users/新闻日报)", folder());
     if (newFolder && newFolder.trim()) {
       GM_setValue("folder", newFolder.trim());
       updateFolderDisplay();
-      GM_notification({ title: "已保存", text: `导出文件夹: ${newFolder.trim()}`, silent: true });
+      GM_notification({ title: "已保存", text: `导出路径: ${newFolder.trim()}`, silent: true });
     }
   }
 
@@ -151,11 +151,14 @@
   function addFeed() {
     const name = prompt("请输入新闻源名称:");
     if (!name || !name.trim()) return;
-    const url = prompt("请输入RSS订阅地址:");
+    const url = prompt("请输入订阅地址:\n- RSS: https://example.com/rss.xml\n- 网页: https://example.com/news.html");
     if (!url || !url.trim()) return;
-    const type = confirm("是JSON格式吗？\n确定:是 / 取消:否(RSS/XML)") ? "j" : "";
+    const type = prompt("类型:\n1 - RSS/XML (默认)\n2 - JSON\n3 - 网页URL") || "1";
+    let t = "";
+    if (type === "2") t = "j";
+    else if (type === "3") t = "w";
     const feeds = getCustomFeeds();
-    feeds.push({ n: name.trim(), u: url.trim(), t: type });
+    feeds.push({ n: name.trim(), u: url.trim(), t });
     saveCustomFeeds(feeds);
     GM_notification({ title: "已添加", text: `${name.trim()} 已添加到自定义源`, silent: true });
   }
@@ -215,6 +218,16 @@
               let ct = it.ctime;
               if (ct) ct = ct > 1e12 ? ct : ct * 1000;
               news.push({ t: it.title || it.titleTxt, l: it.url || "", d: fmt(ct) || fmt(it.pubDate), s: f.n });
+            }
+          });
+        } else if (f.t === "w") {
+          const p = new DOMParser().parseFromString(r, "text/html");
+          const items = p.querySelectorAll("a[href]");
+          items.forEach(it => {
+            const t = it.textContent?.trim() || "";
+            const l = it.getAttribute("href") || "";
+            if (t && l && t.length > 5 && l.startsWith("http")) {
+              news.push({ t: t.substring(0, 100), l, d: fmt(Date.now()), s: f.n });
             }
           });
         } else {
