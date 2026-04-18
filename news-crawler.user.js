@@ -313,6 +313,7 @@
         <div class="nc-header">
           <h1>📰 新闻日报</h1>
           <div class="nc-header-actions">
+            <button class="nc-action-btn" id="nc-settings" title="设置">⚙️</button>
             <span id="nc-opacity-text" style="color:#fff;font-size:12px;min-width:36px;text-align:center">${State.opacity}%</span>
             <button class="nc-action-btn" id="nc-op-minus" title="透明度减少">−</button>
             <button class="nc-action-btn" id="nc-op-plus" title="透明度增加">+</button>
@@ -331,12 +332,6 @@
             <button class="nc-btn nc-btn-primary" id="nc-start">🚀 一键抓取并生成日报</button>
             <button class="nc-btn" id="nc-fetch">🔄 仅抓取新闻</button>
             <button class="nc-btn" id="nc-report">📑 仅生成日报</button>
-          </div>
-          <div class="nc-btn-group">
-            <button class="nc-btn" id="nc-add">➕ 添加新闻源</button>
-            <button class="nc-btn" id="nc-manage">⚙️ 管理新闻源</button>
-            <button class="nc-btn" id="nc-edit-folder">📂 修改导出位置</button>
-            <button class="nc-btn nc-btn-danger" id="nc-clear">🗑️ 清空数据</button>
           </div>
           <div class="nc-section">
             <h3 class="nc-section-title">📋 最新新闻 <span id="nc-list-count"></span></h3>
@@ -364,10 +359,7 @@
         start: UI.sidebar.querySelector("#nc-start"),
         fetch: UI.sidebar.querySelector("#nc-fetch"),
         report: UI.sidebar.querySelector("#nc-report"),
-        add: UI.sidebar.querySelector("#nc-add"),
-        manage: UI.sidebar.querySelector("#nc-manage"),
-        editFolder: UI.sidebar.querySelector("#nc-edit-folder"),
-        clear: UI.sidebar.querySelector("#nc-clear"),
+        settings: UI.sidebar.querySelector("#nc-settings"),
         close: UI.sidebar.querySelector("#nc-close"),
         opMinus: UI.sidebar.querySelector("#nc-op-minus"),
         opPlus: UI.sidebar.querySelector("#nc-op-plus")
@@ -384,10 +376,7 @@
       });
       e.fetch.addEventListener("click", async () => { await Fetcher.fetchAll(); });
       e.report.addEventListener("click", async () => { await Reporter.generate(); });
-      e.add.addEventListener("click", () => UI.showAddModal());
-      e.manage.addEventListener("click", () => UI.showManageModal());
-      e.editFolder.addEventListener("click", () => UI.showFolderModal());
-      e.clear.addEventListener("click", () => UI.showClearModal());
+      e.settings.addEventListener("click", () => UI.showSettingsModal());
       e.close.addEventListener("click", () => UI.sidebar.style.display = "none");
       e.opMinus.addEventListener("click", () => UI.changeOpacity(-10));
       e.opPlus.addEventListener("click", () => UI.changeOpacity(10));
@@ -570,6 +559,33 @@
         Utils.notify("已清空", "所有新闻数据已清除");
         overlay.remove();
       });
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+      overlay.classList.add("active");
+    },
+
+    showSettingsModal: () => {
+      const overlay = GM_addElement("div", { class: "nc-modal-overlay" });
+      overlay.innerHTML = `
+        <div class="nc-modal" style="max-width:420px">
+          <h3>⚙️ 设置</h3>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="nc-btn" id="nc-s-add">➕ 添加新闻源</button>
+            <button class="nc-btn" id="nc-s-manage">⚙️ 管理新闻源</button>
+            <button class="nc-btn" id="nc-s-folder">📂 修改导出位置</button>
+            <button class="nc-btn nc-btn-danger" id="nc-s-clear">🗑️ 清空数据</button>
+          </div>
+          <div class="nc-modal-btns" style="margin-top:16px">
+            <button class="nc-modal-confirm" id="nc-s-close" style="flex:1">关闭</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      overlay.querySelector("#nc-s-add").addEventListener("click", () => { overlay.remove(); UI.showAddModal(); });
+      overlay.querySelector("#nc-s-manage").addEventListener("click", () => { overlay.remove(); UI.showManageModal(); });
+      overlay.querySelector("#nc-s-folder").addEventListener("click", () => { overlay.remove(); UI.showFolderModal(); });
+      overlay.querySelector("#nc-s-clear").addEventListener("click", () => { overlay.remove(); UI.showClearModal(); });
+      overlay.querySelector("#nc-s-close").addEventListener("click", () => overlay.remove());
       overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
       overlay.classList.add("active");
     }
