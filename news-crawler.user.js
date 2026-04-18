@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.1.0
+// @version      2.1.1
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -698,7 +698,14 @@
       overlay.innerHTML = `
         <div class="nc-modal">
           <h3>📂 修改导出位置</h3>
-          <input type="text" id="nc-folder-input" value="${State.folder}" placeholder="导出文件夹路径">
+          <p style="color:#888;font-size:12px;margin-bottom:10px">设置导出文件的文件夹名称，下载时会以此作为默认文件名</p>
+          <input type="text" id="nc-folder-input" value="${State.folder}" placeholder="如：新闻日报 或 C:/Users/xxx/Documents/新闻">
+          <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+            <button class="nc-btn" id="nc-folder-doc" style="padding:6px 10px;font-size:11px">📄 Documents</button>
+            <button class="nc-btn" id="nc-folder-desk" style="padding:6px 10px;font-size:11px">🖥️ Desktop</button>
+            <button class="nc-btn" id="nc-folder-down" style="padding:6px 10px;font-size:11px">📥 Downloads</button>
+          </div>
+          <p style="color:#aaa;font-size:11px">提示：可直接输入文件夹名称或完整路径，下载时会在弹窗中选择保存位置</p>
           <div class="nc-modal-btns">
             <button class="nc-modal-cancel" id="nc-folder-cancel">取消</button>
             <button class="nc-modal-confirm" id="nc-folder-confirm">保存</button>
@@ -707,15 +714,17 @@
       `;
       document.body.appendChild(overlay);
 
+      const input = overlay.querySelector("#nc-folder-input");
+      overlay.querySelector("#nc-folder-doc").addEventListener("click", () => { input.value = "Documents/新闻日报"; });
+      overlay.querySelector("#nc-folder-desk").addEventListener("click", () => { input.value = "Desktop/新闻日报"; });
+      overlay.querySelector("#nc-folder-down").addEventListener("click", () => { input.value = "Downloads/新闻日报"; });
       overlay.querySelector("#nc-folder-cancel").addEventListener("click", () => overlay.remove());
       overlay.querySelector("#nc-folder-confirm").addEventListener("click", () => {
-        const folder = overlay.querySelector("#nc-folder-input").value.trim();
-        if (folder) {
-          Storage.setFolder(folder);
-          UI.updateStats();
-          Utils.notify("已保存", "导出位置: " + folder);
-          overlay.remove();
-        }
+        const folder = input.value.trim() || "新闻日报";
+        Storage.setFolder(folder);
+        UI.updateStats();
+        Utils.notify("已保存", "导出位置: " + folder);
+        overlay.remove();
       });
       overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
       overlay.classList.add("active");
