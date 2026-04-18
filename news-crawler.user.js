@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      0.2.0
+// @version      0.3.0
 // @description  爬取新闻网站的 RSS 订阅源，支持定时更新和导出为 Markdown
 // @author       You
 // @match        *://*/*
@@ -32,11 +32,11 @@
 
   // 默认新闻源
   const DEFAULT_FEEDS = [
-    { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=20&page=1", type: "json" },
+    { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
     { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
     { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
     { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
-    { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=20&page=1", type: "json" },
+    { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
     { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
     { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
   ];
@@ -44,10 +44,10 @@
   // 新闻源预设
   const FEED_PRESETS = {
     "国内综合": [
-      { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=20&page=1", type: "json" },
+      { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
       { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
       { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
-      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=20&page=1", type: "json" },
+      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
     ],
     "科技精选": [
       { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
@@ -55,11 +55,11 @@
       { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
     ],
     "全部新闻源": [
-      { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=20&page=1", type: "json" },
+      { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
       { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
       { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
       { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
-      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=20&page=1", type: "json" },
+      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
       { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
       { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
     ],
@@ -498,7 +498,7 @@
     Object.entries(grouped).forEach(([source, items]) => {
       html += `<div class="nc-source-group">`;
       html += `<div class="nc-source-name">${source} (${items.length})</div>`;
-      items.slice(0, 10).forEach((item) => {
+      items.slice(0, 20).forEach((item) => {
         const date = item.pubDate ? `<span class="nc-item-date">${item.pubDate}</span>` : "";
         html += `
           <div class="nc-item" data-link="${encodeURIComponent(item.link)}">
@@ -507,8 +507,8 @@
           </div>
         `;
       });
-      if (items.length > 10) {
-        html += `<div class="nc-item" style="color:#888;text-align:center;">...还有 ${items.length - 10} 条</div>`;
+      if (items.length > 20) {
+        html += `<div class="nc-item" style="color:#888;text-align:center;">...还有 ${items.length - 20} 条</div>`;
       }
       html += `</div>`;
     });
