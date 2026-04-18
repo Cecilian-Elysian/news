@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.0.2
+// @version      2.0.3
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -31,11 +31,20 @@
       { name: "IT之家", url: "https://www.ithome.com/rss/", type: "rss" },
       { name: "观察者网", url: "https://www.guancha.cn/rss/", type: "rss" },
       { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
+      { name: "少数派", url: "https://sspai.com/rss", type: "rss" },
+      { name: "掘金", url: "https://juejin.cn/rss", type: "rss" },
+      { name: "腾讯科技", url: "https://new.qq.com/rss/index.xml", type: "rss" },
+      { name: "凤凰网", url: "http://www.ifeng.com/rss/news.xml", type: "rss" },
+      { name: "财经网", url: "http://feed.CNaiQ.com/finance", type: "rss" },
+      { name: "第一财经", url: "https://feed.yicai.com/rss", type: "rss" },
+      { name: "参考消息", url: "http://www.cankaoxiaoxi.com/rss/", type: "rss" },
+      { name: "环球时报", url: "http://www.huanqiu.com/rss/", type: "rss" },
     ],
     PRIORITY: {
       "人民日报": 10, "新华网": 10, "央视新闻": 10, "澎湃新闻": 8, "观察者网": 8,
-      "腾讯新闻": 6, "新浪新闻": 6, "网易新闻": 6, "知乎热榜": 7, "36氪": 7, "虎嗅": 7,
-      "IT之家": 6, "搜狐新闻": 5
+      "腾讯新闻": 6, "腾讯科技": 6, "新浪新闻": 6, "网易新闻": 6, "知乎热榜": 7, "36氪": 7, "虎嗅": 7,
+      "IT之家": 6, "搜狐新闻": 5, "少数派": 7, "掘金": 7, "凤凰网": 5, "财经网": 5, "第一财经": 5,
+      "参考消息": 6, "环球时报": 6
     }
   };
 
