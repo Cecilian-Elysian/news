@@ -6,12 +6,12 @@
 
 ## 功能特性
 
-- RSS 订阅源解析（支持 XML 和 JSON 格式）
-- 新闻数据本地存储
-- Markdown 格式导出
-- 轻量级浅色浮窗展示
-- 脚本猫菜单快速入口
-- 用户可配置新闻源
+- ✅ RSS 订阅源解析（支持 XML 和 JSON 格式）
+- ✅ 新闻数据本地存储
+- ✅ Markdown 格式导出
+- ✅ 轻量级浅色浮窗展示
+- ✅ 脚本猫菜单快速入口
+- ✅ 用户可配置新闻源
 
 ## 文件结构
 
@@ -26,14 +26,12 @@ news/
 
 ### Commit History
 
-- [ ] Commit 1: 项目初始化 - 基础脚本框架创建
-- [ ] Commit 2: RSS 获取与解析
-- [ ] Commit 3: 数据存储
-- [ ] Commit 4: Markdown 导出
-- [ ] Commit 5: 浮窗 UI
-- [ ] Commit 6: 菜单入口
-- [ ] Commit 7: 用户配置
-- [ ] Commit 8: README 文档
+- [x] Commit 1: 项目初始化 - 基础脚本框架创建
+- [x] Commit 2: RSS 获取与解析
+- [x] Commit 3: Markdown 导出
+- [x] Commit 4: 浮窗 UI - 浅色主题新闻面板
+- [x] Commit 5: 用户配置 - 新闻源管理
+- [x] Commit 6: README 文档
 
 ## 使用前提
 
