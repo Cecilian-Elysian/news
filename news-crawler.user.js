@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      0.5.0
+// @version      0.6.0
 // @description  爬取新闻网站的 RSS 订阅源，支持定时更新和导出为 Markdown
 // @author       You
 // @match        *://*/*
@@ -45,31 +45,70 @@
 
   // 新闻源预设
   const FEED_PRESETS = {
+    "🏛️ 中央重点": [
+      { name: "人民日报", url: "https://www.people.com.cn/rss/rss.xml", type: "xml" },
+      { name: "新华网", url: "https://www.news.cn/rss/", type: "xml" },
+      { name: "央视网", url: "https://www.cctv.com/rss/rss.xml", type: "xml" },
+      { name: "中国新闻网", url: "https://www.chinanews.com.cn/rss/", type: "xml" },
+      { name: "光明网", url: "https://www.guangming.cn/rss/", type: "xml" },
+      { name: "环球网", url: "https://www.huanqiu.com/rss/", type: "xml" },
+      { name: "参考消息", url: "https://www.cankaoxiaoxie.com/rss", type: "xml" },
+    ],
+    "📰 央媒新闻": [
+      { name: "人民网", url: "https://www.people.com.cn/rss/rss.xml", type: "xml" },
+      { name: "新华网", url: "https://www.news.cn/rss/", type: "xml" },
+      { name: "中国日报", url: "https://www.chinadaily.com.cn/rss/", type: "xml" },
+      { name: "央广网", url: "https://www.cnr.cn/rss/", type: "xml" },
+      { name: "国际在线", url: "https://www.cri.cn/rss/", type: "xml" },
+      { name: "中国网", url: "https://www.china.com.cn/rss/", type: "xml" },
+    ],
+    "💼 商业门户": [
+      { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
+      { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
+      { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
+      { name: "搜狐新闻", url: "https://www.sohu.com/rss/rss.xml", type: "xml" },
+    ],
+    "🔬 科技资讯": [
+      { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
+      { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
+      { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
+      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
+    ],
+    "🌐 热榜聚合": [
+      { name: "RadarAI", url: "https://rsshub.app/radarai.top", type: "xml" },
+      { name: "今日热榜", url: "https://rsshub.app/tophub.today", type: "xml" },
+    ],
+    "📚 学习强国": [
+      { name: "学习强国", url: "https://rsshub.app/xuexi.xuexi.cn", type: "xml" },
+    ],
     "国内综合": [
       { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
       { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
       { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
       { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
     ],
-    "科技精选": [
-      { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
-      { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
-      { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
-      { name: "RadarAI", url: "https://rsshub.app/radarai.top", type: "xml" },
-    ],
-    "热榜聚合": [
-      { name: "今日热榜", url: "https://rsshub.app/tophub.today", type: "xml" },
-    ],
     "全部新闻源": [
+      { name: "人民日报", url: "https://www.people.com.cn/rss/rss.xml", type: "xml" },
+      { name: "新华网", url: "https://www.news.cn/rss/", type: "xml" },
+      { name: "央视网", url: "https://www.cctv.com/rss/rss.xml", type: "xml" },
+      { name: "中国新闻网", url: "https://www.chinanews.com.cn/rss/", type: "xml" },
+      { name: "光明网", url: "https://www.guangming.cn/rss/", type: "xml" },
+      { name: "环球网", url: "https://www.huanqiu.com/rss/", type: "xml" },
+      { name: "参考消息", url: "https://www.cankaoxiaoxie.com/rss", type: "xml" },
+      { name: "中国日报", url: "https://www.chinadaily.com.cn/rss/", type: "xml" },
+      { name: "央广网", url: "https://www.cnr.cn/rss/", type: "xml" },
+      { name: "国际在线", url: "https://www.cri.cn/rss/", type: "xml" },
       { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
       { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
       { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
+      { name: "搜狐新闻", url: "https://www.sohu.com/rss/rss.xml", type: "xml" },
       { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
-      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
       { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
       { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
+      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
       { name: "RadarAI", url: "https://rsshub.app/radarai.top", type: "xml" },
       { name: "今日热榜", url: "https://rsshub.app/tophub.today", type: "xml" },
+      { name: "学习强国", url: "https://rsshub.app/xuexi.xuexi.cn", type: "xml" },
     ],
   };
 
