@@ -427,34 +427,45 @@
 
       let html = "";
       Object.keys(grouped).sort().forEach(src => {
-        html += '<div class="nc-group">';
+        html += '<div class="nc-group" data-source="' + src + '">';
         html += '<div class="nc-group-header"><span>' + src + '</span><span>' + grouped[src].length + '条</span></div>';
-        grouped[src].slice(0, 5).forEach(n => {
-          const click = n.link ? `window.open('${n.link}','_blank')` : "";
-          html += '<div class="nc-item" onclick="' + click + '"><div class="nc-item-title">' + n.title + '</div>';
+        grouped[src].slice(0, 5).forEach((n, idx) => {
+          html += '<div class="nc-item" data-link="' + (n.link || "") + '"><div class="nc-item-title">' + n.title + '</div>';
           html += '<div class="nc-item-meta"><span class="nc-item-source">' + n.source + '</span><span>' + (n.date || "") + '</span></div></div>';
         });
         if (grouped[src].length > 5) {
-          html += '<div class="nc-item nc-show-more" data-source="' + src + '" style="color:#667eea;text-align:center;font-size:11px;cursor:pointer">查看更多 ' + grouped[src].length + ' 条...</div>';
+          html += '<div class="nc-item nc-show-more" style="color:#667eea;text-align:center;font-size:11px;cursor:pointer">查看更多 ' + grouped[src].length + ' 条...</div>';
         }
         html += '</div>';
       });
       el.innerHTML = html;
 
+      el.querySelectorAll(".nc-item[data-link]").forEach(item => {
+        item.addEventListener("click", () => {
+          const link = item.dataset.link;
+          if (link) window.open(link, "_blank");
+        });
+      });
+
       el.querySelectorAll(".nc-show-more").forEach(btn => {
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
-          const src = btn.dataset.source;
           const group = btn.closest(".nc-group");
+          const src = group.dataset.source;
           const items = grouped[src];
           let itemsHtml = "";
-          items.forEach(n => {
-            const click = n.link ? `window.open('${n.link}','_blank')` : "";
-            itemsHtml += '<div class="nc-item" onclick="' + click + '"><div class="nc-item-title">' + n.title + '</div>';
+          items.slice(5).forEach(n => {
+            itemsHtml += '<div class="nc-item" data-link="' + (n.link || "") + '"><div class="nc-item-title">' + n.title + '</div>';
             itemsHtml += '<div class="nc-item-meta"><span class="nc-item-source">' + n.source + '</span><span>' + (n.date || "") + '</span></div></div>';
           });
-          group.querySelector(".nc-item").insertAdjacentHTML("beforeBegin", itemsHtml);
+          btn.insertAdjacentHTML("beforebegin", itemsHtml);
           btn.remove();
+          el.querySelectorAll(".nc-item[data-link]").forEach(item => {
+            item.addEventListener("click", () => {
+              const link = item.dataset.link;
+              if (link) window.open(link, "_blank");
+            });
+          });
         });
       });
     },
