@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      1.0.0
-// @description  定时自动爬取新闻 RSS，后台每30分钟抓取一次
+// @version      1.1.0
+// @description  定时自动爬取新闻 RSS，后台每30分钟抓取，开机首日自动抓取
 // @author       You
 // @background
 // @crontab      */30 * * * *
@@ -25,6 +25,21 @@
   const STORAGE_KEY = "news_crawler_data";
   const FEEDS_KEY = "news_crawler_feeds";
   const VIEWER_KEY = "news_crawler_viewer";
+  const LAST_DATE_KEY = "news_crawler_last_date";
+
+  function getTodayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function isFirstOpenToday() {
+    const lastDate = GM_getValue(LAST_DATE_KEY, "");
+    const today = getTodayStr();
+    if (lastDate !== today) {
+      GM_setValue(LAST_DATE_KEY, today);
+      return true;
+    }
+    return false;
+  }
 
   const DEFAULT_FEEDS = [
     { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
@@ -44,13 +59,18 @@
     if (!GM_getValue(FEEDS_KEY)) {
       GM_setValue(FEEDS_KEY, DEFAULT_FEEDS);
     }
-    console.log("[新闻爬取器] 已启动，后台每30分钟自动抓取");
-    GM_notification({
-      title: "📰 新闻爬取器已启动",
-      text: "后台自动运行，有新消息会通知",
-      silent: true,
-    });
-    fetchAllFeeds();
+    const today = getTodayStr();
+    if (isFirstOpenToday()) {
+      console.log("[新闻爬取器] 今日首次启动，开始抓取...");
+      GM_notification({
+        title: "📰 今日新闻推送",
+        text: "正在获取最新新闻...",
+        silent: true,
+      });
+      fetchAllFeeds();
+    } else {
+      console.log("[新闻爬取器] 已启动，后台每30分钟自动抓取");
+    }
   }
 
   function registerMenuCommands() {
