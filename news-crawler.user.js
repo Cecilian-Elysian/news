@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      0.4.0
+// @version      0.4.1
 // @description  爬取新闻网站的 RSS 订阅源，支持定时更新和导出为 Markdown
 // @author       You
 // @match        *://*/*
@@ -458,6 +458,10 @@
       .nc-item:hover {
         background: #f0f7ff;
       }
+      .nc-item-clickable:hover {
+        background: #e6f0ff;
+        cursor: pointer;
+      }
       .nc-item:last-child {
         border-bottom: none;
       }
@@ -540,12 +544,22 @@
       html += `<div class="nc-source-name">${source} (${items.length})</div>`;
       items.slice(0, 20).forEach((item) => {
         const date = item.pubDate ? `<span class="nc-item-date">${item.pubDate}</span>` : "";
-        html += `
-          <div class="nc-item" data-link="${encodeURIComponent(item.link)}">
+        const hasLink = item.link && item.link.startsWith("http");
+        if (hasLink) {
+          html += `
+          <div class="nc-item nc-item-clickable" data-link="${encodeURIComponent(item.link)}">
             <div class="nc-item-title">${item.title}</div>
             ${date}
           </div>
         `;
+        } else {
+          html += `
+          <div class="nc-item" style="opacity:0.6;">
+            <div class="nc-item-title">${item.title} <span style="color:#ccc;font-size:10px;">[无链接]</span></div>
+            ${date}
+          </div>
+        `;
+        }
       });
       if (items.length > 20) {
         html += `<div class="nc-item" style="color:#888;text-align:center;">...还有 ${items.length - 20} 条</div>`;
@@ -553,10 +567,12 @@
       html += `</div>`;
     });
     listEl.innerHTML = html;
-    listEl.querySelectorAll(".nc-item[data-link]").forEach((el) => {
+    listEl.querySelectorAll(".nc-item-clickable").forEach((el) => {
       el.addEventListener("click", () => {
         const link = decodeURIComponent(el.dataset.link);
-        GM_openInTab(link, { active: true });
+        if (link && link.startsWith("http")) {
+          GM_openInTab(link, { active: true });
+        }
       });
     });
   }
