@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      0.4.1
+// @version      0.5.0
 // @description  爬取新闻网站的 RSS 订阅源，支持定时更新和导出为 Markdown
 // @author       You
 // @match        *://*/*
@@ -39,6 +39,8 @@
     { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
     { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
     { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
+    { name: "RadarAI", url: "https://rsshub.app/radarai.top", type: "xml" },
+    { name: "今日热榜", url: "https://rsshub.app/tophub.today", type: "xml" },
   ];
 
   // 新闻源预设
@@ -53,6 +55,10 @@
       { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
       { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
       { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
+      { name: "RadarAI", url: "https://rsshub.app/radarai.top", type: "xml" },
+    ],
+    "热榜聚合": [
+      { name: "今日热榜", url: "https://rsshub.app/tophub.today", type: "xml" },
     ],
     "全部新闻源": [
       { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
@@ -62,6 +68,8 @@
       { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
       { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
       { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
+      { name: "RadarAI", url: "https://rsshub.app/radarai.top", type: "xml" },
+      { name: "今日热榜", url: "https://rsshub.app/tophub.today", type: "xml" },
     ],
   };
 
