@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.1.1
+// @version      2.1.2
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -354,8 +354,23 @@
   };
 
   const Downloader = {
-    downloadText: (content, fileName) => {
+    dirHandle: null,
+    downloadText: async (content, fileName) => {
       const blob = new Blob(["\uFEFF" + content], { type: "text/plain;charset=utf-8" });
+
+      if (window.showDirectoryPicker && Downloader.dirHandle) {
+        try {
+          const fileHandle = await Downloader.dirHandle.getFileHandle(fileName, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          Utils.notify("下载成功", fileName);
+          return;
+        } catch (e) {
+          console.warn("File System Access API 失败:", e);
+        }
+      }
+
       const url = URL.createObjectURL(blob);
       GM_download({
         url: url,
@@ -367,6 +382,22 @@
         },
         onerror: () => Utils.notify("下载失败", "请重试")
       });
+    },
+    selectFolder: async () => {
+      if (window.showDirectoryPicker) {
+        try {
+          Downloader.dirHandle = await window.showDirectoryPicker();
+          Utils.notify("已选择文件夹", "下载将保存到: " + Downloader.dirHandle.name);
+          Storage.set("downloadFolder", Downloader.dirHandle.name);
+          return true;
+        } catch (e) {
+          console.warn("选择文件夹取消:", e);
+          return false;
+        }
+      } else {
+        Utils.notify("不支持", "您的浏览器不支持文件夹选择功能");
+        return false;
+      }
     }
   };
 
@@ -695,18 +726,25 @@
 
     showFolderModal: () => {
       const overlay = GM_addElement("div", { class: "nc-modal-overlay" });
+      const folderName = Storage.get("downloadFolder") || "";
       overlay.innerHTML = `
         <div class="nc-modal">
           <h3>📂 修改导出位置</h3>
-          <p style="color:#888;font-size:12px;margin-bottom:10px">设置导出文件的文件夹名称，下载时会以此作为默认文件名</p>
-          <input type="text" id="nc-folder-input" value="${State.folder}" placeholder="如：新闻日报 或 C:/Users/xxx/Documents/新闻">
+          <p style="color:#888;font-size:12px;margin-bottom:10px">设置导出文件的文件夹名称</p>
+          <input type="text" id="nc-folder-input" value="${State.folder}" placeholder="如：新闻日报">
           <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
             <button class="nc-btn" id="nc-folder-doc" style="padding:6px 10px;font-size:11px">📄 Documents</button>
             <button class="nc-btn" id="nc-folder-desk" style="padding:6px 10px;font-size:11px">🖥️ Desktop</button>
             <button class="nc-btn" id="nc-folder-down" style="padding:6px 10px;font-size:11px">📥 Downloads</button>
           </div>
-          <p style="color:#aaa;font-size:11px">提示：可直接输入文件夹名称或完整路径，下载时会在弹窗中选择保存位置</p>
-          <div class="nc-modal-btns">
+          <hr style="border:none;border-top:1px solid #eee;margin:12px 0">
+          <p style="color:#888;font-size:12px;margin-bottom:8px">🎯 指定下载文件夹（推荐）</p>
+          <p style="color:#aaa;font-size:11px;margin-bottom:8px">选择后，每次下载会直接保存到指定文件夹，无需选择位置</p>
+          <button class="nc-btn nc-btn-primary" id="nc-select-folder" style="margin-bottom:8px">
+            ${folderName ? "📁 已选择: " + folderName : "📂 选择下载文件夹"}
+          </button>
+          <p style="color:#aaa;font-size:10px">⚠️ 仅 Chrome/Edge 等 Chromium 浏览器支持</p>
+          <div class="nc-modal-btns" style="margin-top:14px">
             <button class="nc-modal-cancel" id="nc-folder-cancel">取消</button>
             <button class="nc-modal-confirm" id="nc-folder-confirm">保存</button>
           </div>
@@ -718,12 +756,19 @@
       overlay.querySelector("#nc-folder-doc").addEventListener("click", () => { input.value = "Documents/新闻日报"; });
       overlay.querySelector("#nc-folder-desk").addEventListener("click", () => { input.value = "Desktop/新闻日报"; });
       overlay.querySelector("#nc-folder-down").addEventListener("click", () => { input.value = "Downloads/新闻日报"; });
+      overlay.querySelector("#nc-select-folder").addEventListener("click", async () => {
+        const success = await Downloader.selectFolder();
+        if (success) {
+          const folder = Storage.get("downloadFolder") || "";
+          overlay.querySelector("#nc-select-folder").textContent = folder ? "📁 已选择: " + folder : "📂 选择下载文件夹";
+        }
+      });
       overlay.querySelector("#nc-folder-cancel").addEventListener("click", () => overlay.remove());
       overlay.querySelector("#nc-folder-confirm").addEventListener("click", () => {
         const folder = input.value.trim() || "新闻日报";
         Storage.setFolder(folder);
         UI.updateStats();
-        Utils.notify("已保存", "导出位置: " + folder);
+        Utils.notify("已保存", "文件名: " + folder);
         overlay.remove();
       });
       overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
