@@ -435,11 +435,28 @@
           html += '<div class="nc-item-meta"><span class="nc-item-source">' + n.source + '</span><span>' + (n.date || "") + '</span></div></div>';
         });
         if (grouped[src].length > 5) {
-          html += '<div class="nc-item" style="color:#667eea;text-align:center;font-size:11px">查看更多...</div>';
+          html += '<div class="nc-item nc-show-more" data-source="' + src + '" style="color:#667eea;text-align:center;font-size:11px;cursor:pointer">查看更多 ' + grouped[src].length + ' 条...</div>';
         }
         html += '</div>';
       });
       el.innerHTML = html;
+
+      el.querySelectorAll(".nc-show-more").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const src = btn.dataset.source;
+          const group = btn.closest(".nc-group");
+          const items = grouped[src];
+          let itemsHtml = "";
+          items.forEach(n => {
+            const click = n.link ? `window.open('${n.link}','_blank')` : "";
+            itemsHtml += '<div class="nc-item" onclick="' + click + '"><div class="nc-item-title">' + n.title + '</div>';
+            itemsHtml += '<div class="nc-item-meta"><span class="nc-item-source">' + n.source + '</span><span>' + (n.date || "") + '</span></div></div>';
+          });
+          group.querySelector(".nc-item").insertAdjacentHTML("beforeBegin", itemsHtml);
+          btn.remove();
+        });
+      });
     },
 
     getStatusEl: () => UI.elements.status,
