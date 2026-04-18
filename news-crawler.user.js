@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.0.9
+// @version      2.1.0
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -49,14 +49,27 @@
       { name: "GitHub趋势", url: "https://rsshub.app/github/trending", type: "rss" },
       { name: "ProductHunt", url: "https://rsshub.app/producthunt/today", type: "rss" },
       { name: "HackerNews", url: "https://rsshub.app/hacker-news/best", type: "rss" },
+      { name: "Reddit编程", url: "https://www.reddit.com/r/programming/.rss", type: "rss" },
+      { name: "Stack Overflow", url: "https://stackprinter/questions?service=stackoverflow&language=zh-CN&width=640", type: "webpage" },
     ],
+    API_ENDPOINTS: {
+      "Bilibili": {
+        url: "https://api.bilibili.com/x/web-interface/ranking/v2?type=all",
+        type: "json"
+      },
+      "36氪": {
+        url: "https://36kr.com/pp/api/newsflash?per_page=20&page=1",
+        type: "json"
+      }
+    },
     PRIORITY: {
       "人民日报": 10, "新华网": 10, "央视新闻": 10, "澎湃新闻": 8, "观察者网": 8,
       "腾讯新闻": 6, "腾讯科技": 6, "新浪新闻": 6, "网易新闻": 6, "知乎热榜": 7, "36氪": 7, "虎嗅": 7,
       "IT之家": 6, "搜狐新闻": 5, "少数派": 7, "掘金": 7, "凤凰网": 5, "财经网": 5, "第一财经": 5,
       "参考消息": 6, "环球时报": 6, "RadarAI": 8,
       "微博热搜": 6, "百度热搜": 6, "Bilibili热搜": 5, "抖音热搜": 5, "即刻热榜": 6,
-      "GitHub趋势": 7, "ProductHunt": 6, "HackerNews": 7
+      "GitHub趋势": 7, "ProductHunt": 6, "HackerNews": 7, "Reddit编程": 7, "Stack Overflow": 6,
+      "Bilibili": 6
     }
   };
 
@@ -167,6 +180,40 @@
       } catch (e) { console.warn("网页解析失败:", sourceName, e); }
       return news;
     },
+    parseBilibili: (data, sourceName) => {
+      const news = [];
+      try {
+        const json = JSON.parse(data);
+        (json.data?.list || []).forEach(item => {
+          if (item.title) {
+            news.push({
+              title: item.title,
+              link: item.short_link_v2 || "https://www.bilibili.com/video/" + item.bvid,
+              date: Utils.formatDate(item.pubdate * 1000),
+              source: sourceName
+            });
+          }
+        });
+      } catch (e) { console.warn("Bilibili解析失败:", sourceName, e); }
+      return news;
+    },
+    parse36kr: (data, sourceName) => {
+      const news = [];
+      try {
+        const json = JSON.parse(data);
+        (json.data?.items || []).forEach(item => {
+          if (item.title) {
+            news.push({
+              title: item.title,
+              link: item.news_url || "https://36kr.com/p/" + item.id,
+              date: Utils.formatDate(item.published_at),
+              source: sourceName
+            });
+          }
+        });
+      } catch (e) { console.warn("36kr解析失败:", sourceName, e); }
+      return news;
+    },
     parse: (data, sourceName, type) => {
       switch (type) {
         case "json": return Parser.parseJSON(data, sourceName);
@@ -189,12 +236,31 @@
         return all.filter(t => t !== primaryType);
       };
 
+      const tryApiEndpoint = async (feedName) => {
+        for (const [apiName, apiConfig] of Object.entries(Config.API_ENDPOINTS)) {
+          if (feedName.includes(apiName) || apiName.includes(feedName)) {
+            try {
+              const data = await Utils.httpReq(apiConfig.url);
+              if (!data || data.length < 10) continue;
+              let parsed = [];
+              if (apiName === "Bilibili") parsed = Parser.parseBilibili(data, feedName);
+              else if (apiName === "36氪") parsed = Parser.parse36kr(data, feedName);
+              else parsed = Parser.parse(data, feedName, apiConfig.type);
+              if (parsed.length > 0) {
+                console.log(feedName + ": API(" + apiName + ")成功");
+                return parsed;
+              }
+            } catch (e) { continue; }
+          }
+        }
+        return [];
+      };
+
       for (let i = 0; i < allFeeds.length; i++) {
         const feed = allFeeds[i];
         statusEl.textContent = "🔄 抓取中 " + (i + 1) + "/" + allFeeds.length + "...";
         const primaryType = feed.type || "rss";
         let parsed = [];
-        let successType = primaryType;
 
         try {
           const data = await Utils.httpReq(feed.url);
@@ -216,10 +282,16 @@
               if (parsed.length > 0) {
                 console.log(feed.name + ": " + primaryType + "失败→" + type + "成功");
                 successCount++;
-                successType = type;
                 break;
               }
             } catch (e) { continue; }
+          }
+        }
+
+        if (parsed.length === 0) {
+          parsed = await tryApiEndpoint(feed.name);
+          if (parsed.length > 0) {
+            successCount++;
           }
         }
 
