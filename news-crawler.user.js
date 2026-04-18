@@ -86,6 +86,7 @@
         <button class="nc-btn primary" id="start">🚀 一键抓取并生成日报</button>
         <button class="nc-btn" id="fetchOnly">🔄 仅抓取新闻</button>
         <button class="nc-btn" id="reportOnly">📑 仅生成日报</button>
+        <button class="nc-btn" id="addFeed">➕ 添加新闻源</button>
         <div class="nc-list">
           <h3>📋 最新新闻</h3>
           <div id="newsList">
@@ -103,6 +104,7 @@
     sidebar.querySelector("#op-").onclick = () => changeOpacity(-10);
     sidebar.querySelector("#op+").onclick = () => changeOpacity(10);
     sidebar.querySelector("#editFolderBtn").onclick = editFolder;
+    sidebar.querySelector("#addFeed").onclick = addFeed;
 
     const floatBtn = GM_addElement("div", {
       style: "position:fixed;bottom:20px;right:20px;width:48px;height:48px;background:linear-gradient(135deg,#4a9eff,#6b5bff);border-radius:50%;box-shadow:0 4px 16px rgba(74,158,255,.4);cursor:pointer;z-index:2147483645;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff",
@@ -141,6 +143,26 @@
       updateFolderDisplay();
       GM_notification({ title: "已保存", text: `导出文件夹: ${newFolder.trim()}`, silent: true });
     }
+  }
+
+  function getCustomFeeds() { return GM_getValue("custom_feeds") || []; }
+  function saveCustomFeeds(arr) { GM_setValue("custom_feeds", arr); }
+
+  function addFeed() {
+    const name = prompt("请输入新闻源名称:");
+    if (!name || !name.trim()) return;
+    const url = prompt("请输入RSS订阅地址:");
+    if (!url || !url.trim()) return;
+    const type = confirm("是JSON格式吗？\n确定:是 / 取消:否(RSS/XML)") ? "j" : "";
+    const feeds = getCustomFeeds();
+    feeds.push({ n: name.trim(), u: url.trim(), t: type });
+    saveCustomFeeds(feeds);
+    GM_notification({ title: "已添加", text: `${name.trim()} 已添加到自定义源`, silent: true });
+  }
+
+  function getAllFeeds() {
+    const custom = getCustomFeeds();
+    return [...FEEDS, ...custom];
   }
 
   function setStatus(s) { sidebar.querySelector("#status").textContent = s; }
@@ -182,7 +204,8 @@
     setStatus("🔄 抓取中...");
     const news = [];
     let ok = 0;
-    for (const f of FEEDS) {
+    const allFeeds = getAllFeeds();
+    for (const f of allFeeds) {
       try {
         const r = await req(f.u);
         if (f.t === "j") {
@@ -213,7 +236,7 @@
     GM_setValue("news_time", Date.now());
     updateStat();
     updateList();
-    setStatus(`✅ 抓取完成: ${ok}/${FEEDS.length}个源, ${news.length}条`);
+    setStatus(`✅ 抓取完成: ${ok}/${allFeeds.length}个源, ${news.length}条`);
     GM_notification({ title: "抓取完成", text: `获取 ${news.length} 条新闻`, silent: true });
   }
 
