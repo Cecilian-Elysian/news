@@ -348,6 +348,7 @@
       UI.cacheElements();
       UI.bindEvents();
       UI.sidebar.style.background = "rgba(255,255,255," + State.opacity / 100 + ")";
+      UI.sidebar.style.display = "none";
     },
 
     cacheElements: () => {
