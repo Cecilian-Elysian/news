@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      0.1.1
+// @version      0.2.0
 // @description  爬取新闻网站的 RSS 订阅源，支持定时更新和导出为 Markdown
 // @author       You
 // @match        *://*/*
@@ -35,7 +35,35 @@
     { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=20&page=1", type: "json" },
     { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
     { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
+    { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
+    { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=20&page=1", type: "json" },
+    { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
+    { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
   ];
+
+  // 新闻源预设
+  const FEED_PRESETS = {
+    "国内综合": [
+      { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=20&page=1", type: "json" },
+      { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
+      { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
+      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=20&page=1", type: "json" },
+    ],
+    "科技精选": [
+      { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
+      { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
+      { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
+    ],
+    "全部新闻源": [
+      { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=20&page=1", type: "json" },
+      { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
+      { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
+      { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
+      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=20&page=1", type: "json" },
+      { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
+      { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
+    ],
+  };
 
   // 初始化
   function init() {
@@ -512,8 +540,8 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 420px;
-        max-height: 80vh;
+        width: 460px;
+        max-height: 85vh;
         background: #fff;
         border: 1px solid #ddd;
         border-radius: 12px;
@@ -556,6 +584,42 @@
         flex: 1;
         overflow-y: auto;
         padding: 16px;
+      }
+      .nc-preset-section {
+        margin-bottom: 16px;
+        padding: 12px;
+        background: #fff8e6;
+        border: 1px solid #ffe58a;
+        border-radius: 8px;
+      }
+      .nc-preset-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #996600;
+        margin-bottom: 10px;
+      }
+      .nc-preset-btns {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .nc-preset-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+        border: 1px solid #ffcc00;
+        background: #fff;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #996600;
+      }
+      .nc-preset-btn:hover {
+        background: #fff8e6;
+        border-color: #ffaa00;
+      }
+      .nc-preset-btn.active {
+        background: #ffaa00;
+        color: #fff;
+        border-color: #ffaa00;
       }
       .nc-feed-item {
         padding: 12px;
@@ -694,6 +758,16 @@
           <button class="nc-config-close">×</button>
         </div>
         <div class="nc-config-body">
+          <div class="nc-preset-section">
+            <div class="nc-preset-title">⚡ 一键切换预设</div>
+            <div class="nc-preset-btns">
+    `;
+    Object.keys(FEED_PRESETS).forEach((presetName) => {
+      html += `<button class="nc-preset-btn" data-preset="${presetName}">${presetName}</button>`;
+    });
+    html += `
+            </div>
+          </div>
           <div class="nc-feed-list">
     `;
     feeds.forEach((feed, index) => {
@@ -727,7 +801,6 @@
               </select>
             </div>
             <button class="nc-add-btn" id="nc-add-feed-btn">添加</button>
-            <button class="nc-reset-btn" id="nc-reset-feeds-btn">恢复默认新闻源</button>
           </div>
         </div>
       </div>
@@ -738,13 +811,33 @@
     configPanel.querySelector(".nc-overlay").addEventListener("click", closeConfigPanel);
     configPanel.querySelector(".nc-config-close").addEventListener("click", closeConfigPanel);
     configPanel.querySelector("#nc-add-feed-btn").addEventListener("click", addNewFeed);
-    configPanel.querySelector("#nc-reset-feeds-btn").addEventListener("click", resetFeeds);
     configPanel.querySelectorAll(".nc-feed-delete").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const index = parseInt(e.target.dataset.index);
         deleteFeed(index);
       });
     });
+    configPanel.querySelectorAll(".nc-preset-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const presetName = e.target.dataset.preset;
+        switchToPreset(presetName);
+      });
+    });
+  }
+
+  function switchToPreset(presetName) {
+    const preset = FEED_PRESETS[presetName];
+    if (!preset) return;
+    if (confirm(`确定切换到「${presetName}」预设吗？`)) {
+      GM_setValue(FEEDS_KEY, preset);
+      GM_notification({
+        title: "已切换",
+        text: `已切换到「${presetName}」，共 ${preset.length} 个新闻源`,
+        silent: true,
+      });
+      closeConfigPanel();
+      openFeedConfig();
+    }
   }
 
   function closeConfigPanel() {
