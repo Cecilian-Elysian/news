@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.0.1
+// @version      2.0.6
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -31,11 +31,21 @@
       { name: "IT之家", url: "https://www.ithome.com/rss/", type: "rss" },
       { name: "观察者网", url: "https://www.guancha.cn/rss/", type: "rss" },
       { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
+      { name: "少数派", url: "https://sspai.com/rss", type: "rss" },
+      { name: "掘金", url: "https://juejin.cn/rss", type: "rss" },
+      { name: "腾讯科技", url: "https://new.qq.com/rss/index.xml", type: "rss" },
+      { name: "凤凰网", url: "http://www.ifeng.com/rss/news.xml", type: "rss" },
+      { name: "财经网", url: "http://feed.CNaiQ.com/finance", type: "rss" },
+      { name: "第一财经", url: "https://feed.yicai.com/rss", type: "rss" },
+      { name: "参考消息", url: "http://www.cankaoxiaoxi.com/rss/", type: "rss" },
+      { name: "环球时报", url: "http://www.huanqiu.com/rss/", type: "rss" },
+      { name: "RadarAI", url: "https://radarai.top/feed.xml", type: "rss" },
     ],
     PRIORITY: {
       "人民日报": 10, "新华网": 10, "央视新闻": 10, "澎湃新闻": 8, "观察者网": 8,
-      "腾讯新闻": 6, "新浪新闻": 6, "网易新闻": 6, "知乎热榜": 7, "36氪": 7, "虎嗅": 7,
-      "IT之家": 6, "搜狐新闻": 5
+      "腾讯新闻": 6, "腾讯科技": 6, "新浪新闻": 6, "网易新闻": 6, "知乎热榜": 7, "36氪": 7, "虎嗅": 7,
+      "IT之家": 6, "搜狐新闻": 5, "少数派": 7, "掘金": 7, "凤凰网": 5, "财经网": 5, "第一财经": 5,
+      "参考消息": 6, "环球时报": 6, "RadarAI": 8
     }
   };
 
@@ -44,7 +54,8 @@
     customFeeds: [],
     opacity: 90,
     folder: "新闻日报",
-    lastFetch: null
+    lastFetch: null,
+    darkMode: false
   };
 
   const Storage = {
@@ -59,7 +70,9 @@
     getOpacity: () => State.opacity,
     setOpacity: (o) => { State.opacity = o; Storage.set("opacity", o); },
     getLastFetch: () => State.lastFetch,
-    setLastFetch: (t) => { State.lastFetch = t; Storage.set("news_time", t); }
+    setLastFetch: (t) => { State.lastFetch = t; Storage.set("news_time", t); },
+    getDarkMode: () => State.darkMode,
+    setDarkMode: (d) => { State.darkMode = d; Storage.set("darkMode", d); }
   };
 
   const Utils = {
@@ -81,9 +94,9 @@
           timeout: 15000,
           onload: (r) => {
             if (r.status >= 200 && r.status < 300) resolve(r.responseText);
-            else reject(new Error("HTTP " + r.status));
+            else reject(new Error("HTTP " + r.status + ": " + (r.responseText?.substring(0, 100) || "")));
           },
-          onerror: () => reject(new Error("请求失败")),
+          onerror: (e) => reject(new Error("请求失败: " + (e?.message || "unknown"))),
           ontimeout: () => reject(new Error("请求超时"))
         });
       });
@@ -96,7 +109,10 @@
       const news = [];
       try {
         const p = new DOMParser().parseFromString(data, "text/xml");
-        if (p.querySelector("parsererror")) return news;
+        if (p.querySelector("parsererror")) {
+          console.warn(sourceName + ": XML解析错误");
+          return news;
+        }
         p.querySelectorAll("item, entry").forEach(item => {
           const title = item.querySelector("title")?.textContent?.trim();
           const link = item.querySelector("link")?.getAttribute("href") || item.querySelector("link")?.textContent?.trim() || "";
@@ -162,10 +178,17 @@
         statusEl.textContent = "🔄 抓取中 " + (i + 1) + "/" + allFeeds.length + "...";
         try {
           const data = await Utils.httpReq(feed.url);
+          if (!data || data.length < 10) {
+            console.warn(feed.name + ": 空响应或数据过短");
+            continue;
+          }
           const parsed = Parser.parse(data, feed.name, feed.type || "rss");
+          if (parsed.length === 0) {
+            console.warn(feed.name + ": 解析成功但无新闻，可能RSS格式异常");
+          }
           news.push(...parsed);
           successCount++;
-        } catch (e) { console.warn(feed.name, e.message); }
+        } catch (e) { console.error(feed.name + " 抓取失败:", e.message); }
       }
 
       news.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
@@ -246,10 +269,12 @@
       State.folder = Storage.get("folder", "新闻日报");
       State.opacity = Storage.get("opacity", 90);
       State.lastFetch = Storage.get("news_time", null);
+      State.darkMode = Storage.get("darkMode", false);
 
       UI.createStyles();
       UI.createSidebar();
       UI.createFloatingButton();
+      UI.applyDarkMode();
       UI.updateStats();
       UI.updateNewsList();
       Utils.notify("📰 新闻日报已就绪", "点击按钮开始抓取");
@@ -257,7 +282,7 @@
 
     createStyles: () => {
       GM_addStyle(`
-        .nc-sidebar{position:fixed;top:0;right:0;width:300px;height:100vh;background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,.12);z-index:2147483646;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif;display:flex;flex-direction:column;transition:background .3s}
+        .nc-sidebar{position:fixed;top:0;right:0;width:300px;height:100vh;background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,.12);z-index:2147483646;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif;display:flex;flex-direction:column;transition:background .3s,color .3s}
         .nc-header{height:64px;padding:0 16px;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
         .nc-header h1{margin:0;font-size:18px;color:#fff;font-weight:600;display:flex;align-items:center;gap:8px}
         .nc-header-actions{display:flex;gap:8px;align-items:center}
@@ -265,10 +290,10 @@
         .nc-action-btn:hover{background:rgba(255,255,255,.35);transform:scale(1.1)}
         .nc-body{flex:1;overflow-y:auto;padding:16px}
         .nc-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-        .nc-stat-card{padding:12px;background:linear-gradient(135deg,#f5f7fa,#e4e8ec);border-radius:10px;text-align:center}
-        .nc-stat-num{font-size:22px;font-weight:700;color:#667eea}
-        .nc-stat-label{font-size:11px;color:#888;margin-top:2px}
-        .nc-status{padding:10px 12px;background:#f0f7ff;border-radius:8px;font-size:12px;color:#667eea;margin-bottom:14px;text-align:center;border:1px solid #e0e9ff}
+        .nc-stat-card{padding:12px;background:linear-gradient(135deg,#f5f7fa,#e4e8ec);border-radius:10px;text-align:center;transition:background .3s}
+        .nc-stat-num{font-size:22px;font-weight:700;color:#667eea;transition:color .3s}
+        .nc-stat-label{font-size:11px;color:#888;margin-top:2px;transition:color .3s}
+        .nc-status{padding:10px 12px;background:#f0f7ff;border-radius:8px;font-size:12px;color:#667eea;margin-bottom:14px;text-align:center;border:1px solid #e0e9ff;transition:all .3s}
         .nc-btn-group{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
         .nc-btn{display:block;width:100%;padding:12px 14px;background:#fff;border:1px solid #e0e0e0;border-radius:10px;cursor:pointer;font-size:13px;color:#333;text-align:left;transition:all .2s;font-family:inherit}
         .nc-btn:hover{background:#f8f9ff;border-color:#667eea;color:#667eea}
@@ -277,24 +302,24 @@
         .nc-btn-primary:hover{filter:brightness(1.08);color:#fff}
         .nc-btn-danger{color:#e74c3c;border-color:#e74c3c}
         .nc-btn-danger:hover{background:#fef5f5}
-        .nc-section{border-top:1px solid #eee;padding-top:14px;margin-top:4px}
-        .nc-section-title{font-size:12px;color:#888;margin:0 0 10px;font-weight:600;display:flex;align-items:center;gap:6px}
+        .nc-section{border-top:1px solid #eee;padding-top:14px;margin-top:4px;transition:border-color .3s}
+        .nc-section-title{font-size:12px;color:#888;margin:0 0 10px;font-weight:600;display:flex;align-items:center;gap:6px;transition:color .3s}
         .nc-group{margin-bottom:12px}
-        .nc-group-header{padding:8px 10px;background:#f5f5f5;font-size:11px;font-weight:600;color:#555;border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between}
-        .nc-item{padding:10px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;cursor:pointer;color:#333;transition:background .15s;border-radius:0}
+        .nc-group-header{padding:8px 10px;background:#f5f5f5;font-size:11px;font-weight:600;color:#555;border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between;transition:all .3s}
+        .nc-item{padding:10px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;cursor:pointer;color:#333;transition:background .15s,color .3s;border-radius:0}
         .nc-item:hover{background:#f8f9ff}
         .nc-item:last-child{border:none}
         .nc-item-title{line-height:1.45;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-        .nc-item-meta{font-size:10px;color:#aaa;display:flex;gap:8px}
+        .nc-item-meta{font-size:10px;color:#aaa;display:flex;gap:8px;transition:color .3s}
         .nc-item-source{color:#667eea}
-        .nc-empty{text-align:center;color:#bbb;font-size:13px;padding:40px 0}
+        .nc-empty{text-align:center;color:#bbb;font-size:13px;padding:40px 0;transition:color .3s}
         .nc-float-btn{position:fixed;bottom:24px;right:24px;width:56px;height:56px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;box-shadow:0 6px 20px rgba(102,126,234,.4);cursor:pointer;z-index:2147483645;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;transition:all .3s}
         .nc-float-btn:hover{transform:scale(1.1);box-shadow:0 8px 28px rgba(102,126,234,.5)}
         .nc-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:2147483647;display:none;align-items:center;justify-content:center}
         .nc-modal-overlay.active{display:flex}
-        .nc-modal{background:#fff;border-radius:14px;padding:24px;width:90%;max-width:380px;font-family:inherit}
-        .nc-modal h3{margin:0 0 16px;font-size:16px;color:#333}
-        .nc-modal input,.nc-modal select{width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;font-family:inherit}
+        .nc-modal{background:#fff;border-radius:14px;padding:24px;width:90%;max-width:380px;font-family:inherit;transition:background .3s,color .3s}
+        .nc-modal h3{margin:0 0 16px;font-size:16px;color:#333;transition:color .3s}
+        .nc-modal input,.nc-modal select{width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;font-family:inherit;background:#fff;color:#333;transition:all .3s}
         .nc-modal input:focus,.nc-modal select:focus{outline:none;border-color:#667eea}
         .nc-modal-btns{display:flex;gap:10px;margin-top:14px}
         .nc-modal-btns button{flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-size:13px;transition:all .2s;font-family:inherit}
@@ -304,6 +329,27 @@
         .nc-modal-confirm:hover{background:#5a70dd}
         .nc-toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:2147483647;opacity:0;transition:opacity .3s}
         .nc-toast.show{opacity:1}
+        .nc-dark{background:#1a1a2e!important;color:#e0e0e0!important}
+        .nc-dark .nc-header{background:linear-gradient(135deg,#1a1a2e,#16213e)}
+        .nc-dark .nc-stat-card{background:linear-gradient(135deg,#2d2d44,#1f1f35)}
+        .nc-dark .nc-stat-num{color:#a0a0ff}
+        .nc-dark .nc-stat-label{color:#888}
+        .nc-dark .nc-status{background:#252540;border-color:#3a3a5c;color:#a0a0ff}
+        .nc-dark .nc-btn{background:#252540;border-color:#3a3a5c;color:#e0e0e0}
+        .nc-dark .nc-btn:hover{background:#2d2d50;border-color:#667eea;color:#a0a0ff}
+        .nc-dark .nc-section{border-color:#333}
+        .nc-dark .nc-section-title{color:#888}
+        .nc-dark .nc-group-header{background:#252540;color:#a0a0ff}
+        .nc-dark .nc-item{color:#e0e0e0;border-color:#333}
+        .nc-dark .nc-item:hover{background:#252540}
+        .nc-dark .nc-item-meta{color:#888}
+        .nc-dark .nc-item-source{color:#a0a0ff}
+        .nc-dark .nc-empty{color:#666}
+        .nc-dark .nc-modal{background:#1f1f35}
+        .nc-dark .nc-modal h3{color:#e0e0e0}
+        .nc-dark .nc-modal input,.nc-dark .nc-modal select{background:#252540;border-color:#3a3a5c;color:#e0e0e0}
+        .nc-dark .nc-modal-cancel{background:#2d2d44;color:#a0a0ff}
+        .nc-dark .nc-float-btn{background:linear-gradient(135deg,#1a1a2e,#16213e)}
       `);
     },
 
@@ -327,7 +373,7 @@
             <div class="nc-stat-card"><div class="nc-stat-num" id="nc-time">-</div><div class="nc-stat-label">最后更新</div></div>
             <div class="nc-stat-card"><div class="nc-stat-num" id="nc-folder" style="font-size:14px">📁</div><div class="nc-stat-label">导出位置</div></div>
           </div>
-          <div class="nc-status" id="nc-status">点击按钮开始抓取新闻</div>
+          <div class="nc-status" id="nc-status"></div>
           <div class="nc-btn-group">
             <button class="nc-btn nc-btn-primary" id="nc-start">🚀 一键抓取并生成日报</button>
             <button class="nc-btn" id="nc-fetch">🔄 仅抓取新闻</button>
@@ -600,6 +646,7 @@
             <button class="nc-btn" id="nc-s-add">➕ 添加新闻源</button>
             <button class="nc-btn" id="nc-s-manage">⚙️ 管理新闻源</button>
             <button class="nc-btn" id="nc-s-folder">📂 修改导出位置</button>
+            <button class="nc-btn" id="nc-s-dark">${State.darkMode ? "☀️ 日间模式" : "🌙 夜间模式"}</button>
             <button class="nc-btn nc-btn-danger" id="nc-s-clear">🗑️ 清空数据</button>
           </div>
           <div class="nc-modal-btns" style="margin-top:16px">
@@ -612,10 +659,25 @@
       overlay.querySelector("#nc-s-add").addEventListener("click", () => { overlay.remove(); UI.showAddModal(); });
       overlay.querySelector("#nc-s-manage").addEventListener("click", () => { overlay.remove(); UI.showManageModal(); });
       overlay.querySelector("#nc-s-folder").addEventListener("click", () => { overlay.remove(); UI.showFolderModal(); });
+      overlay.querySelector("#nc-s-dark").addEventListener("click", () => {
+        State.darkMode = !State.darkMode;
+        Storage.setDarkMode(State.darkMode);
+        UI.applyDarkMode();
+        overlay.remove();
+        Utils.notify(State.darkMode ? "🌙 夜间模式" : "☀️ 日间模式", "已切换");
+      });
       overlay.querySelector("#nc-s-clear").addEventListener("click", () => { overlay.remove(); UI.showClearModal(); });
       overlay.querySelector("#nc-s-close").addEventListener("click", () => overlay.remove());
       overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
       overlay.classList.add("active");
+    },
+
+    applyDarkMode: () => {
+      if (State.darkMode) {
+        UI.sidebar.classList.add("nc-dark");
+      } else {
+        UI.sidebar.classList.remove("nc-dark");
+      }
     }
   };
 
