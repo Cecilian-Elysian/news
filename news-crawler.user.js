@@ -493,9 +493,301 @@
     });
   }
 
-  // ========== 用户配置（待实现） ==========
+  // ========== 用户配置 ==========
+
+  let configPanel = null;
+
   function openFeedConfig() {
-    console.log("[新闻爬取器] 打开配置面板");
+    if (configPanel) {
+      configPanel.remove();
+      configPanel = null;
+    }
+    createConfigPanel();
+  }
+
+  function createConfigPanel() {
+    const styles = `
+      .nc-config-panel {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 420px;
+        max-height: 80vh;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        z-index: 2147483647;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .nc-config-header {
+        padding: 16px;
+        background: #fafafa;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .nc-config-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #333;
+        margin: 0;
+      }
+      .nc-config-close {
+        width: 28px;
+        height: 28px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 20px;
+        color: #999;
+        border-radius: 4px;
+      }
+      .nc-config-close:hover {
+        background: #eee;
+        color: #666;
+      }
+      .nc-config-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+      }
+      .nc-feed-item {
+        padding: 12px;
+        background: #f9f9f9;
+        border: 1px solid #eee;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+      .nc-feed-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .nc-feed-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 4px;
+      }
+      .nc-feed-url {
+        font-size: 11px;
+        color: #888;
+        word-break: break-all;
+      }
+      .nc-feed-type {
+        font-size: 10px;
+        color: #fff;
+        background: #4a9eff;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-left: 6px;
+      }
+      .nc-feed-delete {
+        padding: 4px 8px;
+        border: none;
+        background: #ff4d4d;
+        color: #fff;
+        font-size: 11px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-left: 8px;
+      }
+      .nc-feed-delete:hover {
+        background: #ff3333;
+      }
+      .nc-add-feed {
+        padding: 12px;
+        background: #f0f7ff;
+        border: 1px dashed #4a9eff;
+        border-radius: 8px;
+      }
+      .nc-add-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #4a9eff;
+        margin-bottom: 10px;
+      }
+      .nc-form-row {
+        margin-bottom: 8px;
+      }
+      .nc-form-label {
+        font-size: 11px;
+        color: #666;
+        margin-bottom: 3px;
+        display: block;
+      }
+      .nc-form-input {
+        width: 100%;
+        padding: 8px 10px;
+        font-size: 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        box-sizing: border-box;
+      }
+      .nc-form-input:focus {
+        outline: none;
+        border-color: #4a9eff;
+      }
+      .nc-form-select {
+        width: 100%;
+        padding: 8px 10px;
+        font-size: 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        background: #fff;
+      }
+      .nc-add-btn {
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        border: none;
+        background: #4a9eff;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .nc-add-btn:hover {
+        background: #3a8eef;
+      }
+      .nc-reset-btn {
+        width: 100%;
+        padding: 8px;
+        margin-top: 8px;
+        border: 1px solid #ddd;
+        background: #fff;
+        color: #666;
+        font-size: 12px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .nc-reset-btn:hover {
+        background: #f5f5f5;
+      }
+      .nc-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.3);
+        z-index: 2147483646;
+      }
+    `;
+    GM_addStyle(styles);
+
+    const feeds = getFeeds();
+    let html = `
+      <div class="nc-overlay"></div>
+      <div class="nc-config-panel">
+        <div class="nc-config-header">
+          <span class="nc-config-title">⚙️ 新闻源配置</span>
+          <button class="nc-config-close">×</button>
+        </div>
+        <div class="nc-config-body">
+          <div class="nc-feed-list">
+    `;
+    feeds.forEach((feed, index) => {
+      html += `
+        <div class="nc-feed-item" data-index="${index}">
+          <div class="nc-feed-info">
+            <div class="nc-feed-name">${feed.name}<span class="nc-feed-type">${feed.type || "xml"}</span></div>
+            <div class="nc-feed-url">${feed.url}</div>
+          </div>
+          <button class="nc-feed-delete" data-index="${index}">删除</button>
+        </div>
+      `;
+    });
+    html += `
+          </div>
+          <div class="nc-add-feed">
+            <div class="nc-add-title">+ 添加新闻源</div>
+            <div class="nc-form-row">
+              <label class="nc-form-label">名称</label>
+              <input type="text" class="nc-form-input" id="nc-feed-name" placeholder="例如：澎湃新闻">
+            </div>
+            <div class="nc-form-row">
+              <label class="nc-form-label">RSS URL</label>
+              <input type="text" class="nc-form-input" id="nc-feed-url" placeholder="https://...">
+            </div>
+            <div class="nc-form-row">
+              <label class="nc-form-label">类型</label>
+              <select class="nc-form-select" id="nc-feed-type">
+                <option value="xml">XML (RSS/Atom)</option>
+                <option value="json">JSON</option>
+              </select>
+            </div>
+            <button class="nc-add-btn" id="nc-add-feed-btn">添加</button>
+            <button class="nc-reset-btn" id="nc-reset-feeds-btn">恢复默认新闻源</button>
+          </div>
+        </div>
+      </div>
+    `;
+    configPanel = document.createElement("div");
+    configPanel.innerHTML = html;
+    document.body.appendChild(configPanel);
+    configPanel.querySelector(".nc-overlay").addEventListener("click", closeConfigPanel);
+    configPanel.querySelector(".nc-config-close").addEventListener("click", closeConfigPanel);
+    configPanel.querySelector("#nc-add-feed-btn").addEventListener("click", addNewFeed);
+    configPanel.querySelector("#nc-reset-feeds-btn").addEventListener("click", resetFeeds);
+    configPanel.querySelectorAll(".nc-feed-delete").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const index = parseInt(e.target.dataset.index);
+        deleteFeed(index);
+      });
+    });
+  }
+
+  function closeConfigPanel() {
+    if (configPanel) {
+      configPanel.remove();
+      configPanel = null;
+    }
+  }
+
+  function addNewFeed() {
+    const nameInput = configPanel.querySelector("#nc-feed-name");
+    const urlInput = configPanel.querySelector("#nc-feed-url");
+    const typeSelect = configPanel.querySelector("#nc-feed-type");
+    const name = nameInput.value.trim();
+    const url = urlInput.value.trim();
+    const type = typeSelect.value;
+    if (!name || !url) {
+      alert("请填写名称和 URL");
+      return;
+    }
+    const feeds = getFeeds();
+    feeds.push({ name, url, type });
+    GM_setValue(FEEDS_KEY, feeds);
+    GM_notification({ title: "添加成功", text: `已添加「${name}」`, silent: true });
+    closeConfigPanel();
+    openFeedConfig();
+  }
+
+  function deleteFeed(index) {
+    const feeds = getFeeds();
+    const deleted = feeds.splice(index, 1)[0];
+    GM_setValue(FEEDS_KEY, feeds);
+    GM_notification({ title: "已删除", text: `已删除「${deleted.name}」`, silent: true });
+    closeConfigPanel();
+    openFeedConfig();
+  }
+
+  function resetFeeds() {
+    if (confirm("确定恢复默认新闻源吗？")) {
+      GM_setValue(FEEDS_KEY, DEFAULT_FEEDS);
+      GM_notification({ title: "已重置", text: "已恢复默认新闻源", silent: true });
+      closeConfigPanel();
+    }
   }
 
   // 启动
