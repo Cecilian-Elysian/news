@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      0.8.0
+// @version      0.9.0
 // @description  爬取新闻网站的 RSS 订阅源，支持定时更新和导出为 Markdown
 // @author       You
 // @match        *://*/*
@@ -30,85 +30,89 @@
   const STORAGE_KEY = "news_crawler_data";
   const FEEDS_KEY = "news_crawler_feeds";
 
-  // 默认新闻源
+  // 默认新闻源（最可靠的 RSS 源）
   const DEFAULT_FEEDS = [
     { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
     { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
     { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
+    { name: "搜狐新闻", url: "https://www.sohu.com/rss/rss.xml", type: "xml" },
     { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
-    { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
     { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
-    { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
-    { name: "RadarAI", url: "https://rsshub.app/radarai.top", type: "xml" },
-    { name: "今日热榜", url: "https://rsshub.app/tophub.today", type: "xml" },
+    { name: "虎嗅", url: "https://www.huxiu.com/rss/", type: "xml" },
+    { name: "IT之家", url: "https://www.ithome.com/rss/", type: "xml" },
+    { name: "观察者网", url: "https://www.guancha.cn/rss/", type: "xml" },
   ];
 
-  // 新闻源预设
+  // 新闻源预设（使用可靠的 RSS 源）
   const FEED_PRESETS = {
-    "🏛️ 中央重点": [
-      { name: "人民日报", url: "https://www.people.com.cn/rss/rss.xml", type: "xml" },
-      { name: "新华网", url: "https://www.news.cn/rss/", type: "xml" },
-      { name: "央视网", url: "https://www.cctv.com/rss/rss.xml", type: "xml" },
-      { name: "中国新闻网", url: "https://www.chinanews.com.cn/rss/", type: "xml" },
-      { name: "光明网", url: "https://www.guangming.cn/rss/", type: "xml" },
-      { name: "环球网", url: "https://www.huanqiu.com/rss/", type: "xml" },
-      { name: "参考消息", url: "https://www.cankaoxiaoxie.com/rss", type: "xml" },
-    ],
-    "📰 央媒新闻": [
-      { name: "人民网", url: "https://www.people.com.cn/rss/rss.xml", type: "xml" },
-      { name: "新华网", url: "https://www.news.cn/rss/", type: "xml" },
-      { name: "中国日报", url: "https://www.chinadaily.com.cn/rss/", type: "xml" },
-      { name: "央广网", url: "https://www.cnr.cn/rss/", type: "xml" },
-      { name: "国际在线", url: "https://www.cri.cn/rss/", type: "xml" },
-      { name: "中国网", url: "https://www.china.com.cn/rss/", type: "xml" },
-    ],
     "💼 商业门户": [
       { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
       { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
       { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
       { name: "搜狐新闻", url: "https://www.sohu.com/rss/rss.xml", type: "xml" },
+      { name: "凤凰网", url: "https://www.ifeng.com/rss/", type: "xml" },
     ],
     "🔬 科技资讯": [
       { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
       { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
       { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
+      { name: "虎嗅", url: "https://www.huxiu.com/rss/", type: "xml" },
+      { name: "爱范儿", url: "https://www.ifanr.com/feed", type: "xml" },
+      { name: "极客公园", url: "https://www.geekpark.net/rss", type: "xml" },
+    ],
+    "📰 主流媒体": [
       { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
+      { name: "观察者网", url: "https://www.guancha.cn/rss/", type: "xml" },
+      { name: "环球时报", url: "https://www.huanqiu.com/rss/", type: "xml" },
+      { name: "参考消息", url: "https://www.cankaoxiaoxie.com/rss", type: "xml" },
     ],
     "🌐 热榜聚合": [
-      { name: "RadarAI", url: "https://rsshub.app/radarai.top", type: "xml" },
+      { name: "微博热搜", url: "https://rsshub.app/weibo/hot/search", type: "xml" },
+      { name: "知乎热榜", url: "https://rsshub.app/zhihu/hot", type: "xml" },
+      { name: "抖音热榜", url: "https://rsshub.app/douyin/hot-search", type: "xml" },
+      { name: "哔哩哔哩", url: "https://rsshub.app/bilibili/hot-list", type: "xml" },
       { name: "今日热榜", url: "https://rsshub.app/tophub.today", type: "xml" },
     ],
-    "📚 学习强国": [
-      { name: "学习强国", url: "https://rsshub.app/xuexi.xuexi.cn", type: "xml" },
-    ],
-    "国内综合": [
-      { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
-      { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
-      { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
-      { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
-    ],
-    "全部新闻源": [
+    "🏛️ 央媒综合": [
       { name: "人民日报", url: "https://www.people.com.cn/rss/rss.xml", type: "xml" },
       { name: "新华网", url: "https://www.news.cn/rss/", type: "xml" },
-      { name: "央视网", url: "https://www.cctv.com/rss/rss.xml", type: "xml" },
+      { name: "央视新闻", url: "https://www.cctv.com/rss/rss.xml", type: "xml" },
       { name: "中国新闻网", url: "https://www.chinanews.com.cn/rss/", type: "xml" },
-      { name: "光明网", url: "https://www.guangming.cn/rss/", type: "xml" },
-      { name: "环球网", url: "https://www.huanqiu.com/rss/", type: "xml" },
-      { name: "参考消息", url: "https://www.cankaoxiaoxie.com/rss", type: "xml" },
-      { name: "中国日报", url: "https://www.chinadaily.com.cn/rss/", type: "xml" },
-      { name: "央广网", url: "https://www.cnr.cn/rss/", type: "xml" },
-      { name: "国际在线", url: "https://www.cri.cn/rss/", type: "xml" },
+    ],
+    "🎯 今日简报": [
+      { name: "抽屉新热榜", url: "https://rsshub.app/chouti/top", type: "xml" },
+      { name: "IT之家", url: "https://www.ithome.com/rss/", type: "xml" },
+      { name: "品玩", url: "https://www.pingwest.com/feed", type: "xml" },
+      { name: "Solidot", url: "https://www.solidot.org/index.rss", type: "xml" },
+    ],
+    "全部新闻源": [
+      // 商业门户
       { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
       { name: "腾讯新闻", url: "https://rss.qq.com/news.xml", type: "xml" },
       { name: "网易新闻", url: "https://news.163.com/special/rss/newsrdf.xml", type: "xml" },
       { name: "搜狐新闻", url: "https://www.sohu.com/rss/rss.xml", type: "xml" },
+      { name: "凤凰网", url: "https://www.ifeng.com/rss/", type: "xml" },
+      // 科技
       { name: "知乎热榜", url: "https://www.zhihu.com/rss", type: "xml" },
       { name: "36氪", url: "https://36kr.com/feed", type: "xml" },
       { name: "少数派", url: "https://sspai.com/feed", type: "xml" },
+      { name: "虎嗅", url: "https://www.huxiu.com/rss/", type: "xml" },
+      { name: "爱范儿", url: "https://www.ifanr.com/feed", type: "xml" },
+      { name: "极客公园", url: "https://www.geekpark.net/rss", type: "xml" },
+      // 主流媒体
       { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
-      { name: "RadarAI", url: "https://rsshub.app/radarai.top", type: "xml" },
+      { name: "观察者网", url: "https://www.guancha.cn/rss/", type: "xml" },
+      { name: "环球时报", url: "https://www.huanqiu.com/rss/", type: "xml" },
+      // 热榜
+      { name: "微博热搜", url: "https://rsshub.app/weibo/hot/search", type: "xml" },
+      { name: "知乎热榜", url: "https://rsshub.app/zhihu/hot", type: "xml" },
+      { name: "抖音热榜", url: "https://rsshub.app/douyin/hot-search", type: "xml" },
+      { name: "哔哩哔哩", url: "https://rsshub.app/bilibili/hot-list", type: "xml" },
       { name: "今日热榜", url: "https://rsshub.app/tophub.today", type: "xml" },
-      { name: "学习强国", url: "https://rsshub.app/xuexi.xuexi.cn", type: "xml" },
+      // IT科技
+      { name: "IT之家", url: "https://www.ithome.com/rss/", type: "xml" },
+      { name: "品玩", url: "https://www.pingwest.com/feed", type: "xml" },
+      { name: "Solidot", url: "https://www.solidot.org/index.rss", type: "xml" },
     ],
   };
 
@@ -623,24 +627,29 @@
     return items;
   }
 
-  async function fetchSingleFeed(feed) {
-    try {
-      const { data, type } = await fetchFeed(feed.url, feed.type || type);
-      console.log(`[新闻爬取器] ${feed.name}: 获取到 ${data.length} 字节`);
-      if (type === "json" || feed.type === "json") {
-        const jsonObj = JSON.parse(data);
-        const items = extractNewsFromJSON(jsonObj, feed.name);
-        console.log(`[新闻爬取器] ${feed.name}: 解析出 ${items.length} 条`);
-        return items;
-      } else {
-        const doc = parseXML(data);
-        const items = extractNewsFromXML(doc, feed.name);
-        console.log(`[新闻爬取器] ${feed.name}: 解析出 ${items.length} 条`);
-        return items;
+async function fetchSingleFeed(feed, retries = 1) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const { data, type } = await fetchFeed(feed.url, feed.type || "xml");
+        console.log(`[新闻爬取器] ${feed.name}: 获取成功 ${data.length} 字节`);
+        if (type === "json" || feed.type === "json") {
+          const jsonObj = JSON.parse(data);
+          const items = extractNewsFromJSON(jsonObj, feed.name);
+          console.log(`[新闻爬取器] ${feed.name}: 解析出 ${items.length} 条`);
+          return { success: true, items, source: feed.name };
+        } else {
+          const doc = parseXML(data);
+          const items = extractNewsFromXML(doc, feed.name);
+          console.log(`[新闻爬取器] ${feed.name}: 解析出 ${items.length} 条`);
+          return { success: true, items, source: feed.name };
+        }
+      } catch (error) {
+        console.warn(`[新闻爬取器] ${feed.name} 第${attempt + 1}次失败: ${error.message}`);
+        if (attempt >= retries) {
+          return { success: false, items: [], source: feed.name, error: error.message };
+        }
+        await new Promise(r => setTimeout(r, 1000));
       }
-    } catch (error) {
-      console.error(`[新闻爬取器] ${feed.name} 失败:`, error.message);
-      return [];
     }
   }
 
@@ -649,20 +658,34 @@
     const feeds = getFeeds();
     if (feeds.length === 0) {
       GM_notification({
-        title: "新闻爬取",
+        title: "新闻抓取",
         text: "请先添加新闻源",
         silent: true,
       });
       return [];
     }
     const allNews = [];
+    const results = [];
+    let successCount = 0;
+    let failCount = 0;
     for (const feed of feeds) {
-      const news = await fetchSingleFeed(feed);
-      allNews.push(...news);
-      console.log(`[新闻爬取器] ${feed.name}: 获取到 ${news.length} 条新闻`);
+      const result = await fetchSingleFeed(feed);
+      results.push(result);
+      if (result.success) {
+        allNews.push(...result.items);
+        successCount++;
+      } else {
+        failCount++;
+      }
     }
     allNews.sort((a, b) => b.crawledAt - a.crawledAt);
     saveNews(allNews);
+    const failList = results.filter(r => !r.success).map(r => `${r.source}: ${r.error}`).join("; ");
+    GM_notification({
+      title: "抓取完成",
+      text: `成功 ${successCount}/${feeds.length} 个源，共 ${allNews.length} 条${failCount > 0 ? ` (${failCount}个失败)` : ""}`,
+      silent: true,
+    });
     updateBadge();
     GM_notification({
       title: "新闻爬取完成",
