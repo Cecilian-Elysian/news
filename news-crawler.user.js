@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.0.7
+// @version      2.0.8
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -173,7 +173,7 @@
       let statusEl = UI.getStatusEl();
       statusEl.textContent = "🔄 抓取中 0/" + allFeeds.length + "...";
 
-      const getFallbackTypes = (primaryType) => {
+      const fallback = (primaryType) => {
         const all = ["rss", "json", "webpage"];
         return all.filter(t => t !== primaryType);
       };
@@ -182,25 +182,39 @@
         const feed = allFeeds[i];
         statusEl.textContent = "🔄 抓取中 " + (i + 1) + "/" + allFeeds.length + "...";
         const primaryType = feed.type || "rss";
-        const types = [primaryType, ...getFallbackTypes(primaryType)];
-        let fetched = false;
+        let parsed = [];
+        let successType = primaryType;
 
-        for (const type of types) {
-          try {
-            const data = await Utils.httpReq(feed.url);
-            if (!data || data.length < 10) continue;
-            const parsed = Parser.parse(data, feed.name, type);
+        try {
+          const data = await Utils.httpReq(feed.url);
+          if (data && data.length >= 10) {
+            parsed = Parser.parse(data, feed.name, primaryType);
             if (parsed.length > 0) {
-              news.push(...parsed);
-              console.log(feed.name + ": " + type + "成功");
-              fetched = true;
+              console.log(feed.name + ": " + primaryType + "成功");
               successCount++;
-              break;
             }
-          } catch (e) { continue; }
+          }
+        } catch (e) { console.warn(feed.name + ": " + primaryType + "失败") }
+
+        if (parsed.length === 0) {
+          for (const type of fallback(primaryType)) {
+            try {
+              const data = await Utils.httpReq(feed.url);
+              if (!data || data.length < 10) continue;
+              parsed = Parser.parse(data, feed.name, type);
+              if (parsed.length > 0) {
+                console.log(feed.name + ": " + primaryType + "失败→" + type + "成功");
+                successCount++;
+                successType = type;
+                break;
+              }
+            } catch (e) { continue; }
+          }
         }
 
-        if (!fetched) {
+        if (parsed.length > 0) {
+          news.push(...parsed);
+        } else {
           console.error(feed.name + ": 所有方式均失败");
         }
       }
