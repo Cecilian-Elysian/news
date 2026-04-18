@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.0.6
+// @version      2.1.2
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -40,12 +40,36 @@
       { name: "参考消息", url: "http://www.cankaoxiaoxi.com/rss/", type: "rss" },
       { name: "环球时报", url: "http://www.huanqiu.com/rss/", type: "rss" },
       { name: "RadarAI", url: "https://radarai.top/feed.xml", type: "rss" },
+      { name: "微博热搜", url: "https://rsshub.app/weibo/hot", type: "rss" },
+      { name: "知乎热榜", url: "https://rsshub.app/zhihu/hot", type: "rss" },
+      { name: "百度热搜", url: "https://rsshub.app/baidu/hot", type: "rss" },
+      { name: "Bilibili热搜", url: "https://rsshub.app/bilibili/hot", type: "rss" },
+      { name: "抖音热搜", url: "https://rsshub.app/douyin/hot", type: "rss" },
+      { name: "即刻热榜", url: "https://rsshub.app/jike/topic/default", type: "rss" },
+      { name: "GitHub趋势", url: "https://rsshub.app/github/trending", type: "rss" },
+      { name: "ProductHunt", url: "https://rsshub.app/producthunt/today", type: "rss" },
+      { name: "HackerNews", url: "https://rsshub.app/hacker-news/best", type: "rss" },
+      { name: "Reddit编程", url: "https://www.reddit.com/r/programming/.rss", type: "rss" },
+      { name: "Stack Overflow", url: "https://stackprinter/questions?service=stackoverflow&language=zh-CN&width=640", type: "webpage" },
     ],
+    API_ENDPOINTS: {
+      "Bilibili": {
+        url: "https://api.bilibili.com/x/web-interface/ranking/v2?type=all",
+        type: "json"
+      },
+      "36氪": {
+        url: "https://36kr.com/pp/api/newsflash?per_page=20&page=1",
+        type: "json"
+      }
+    },
     PRIORITY: {
       "人民日报": 10, "新华网": 10, "央视新闻": 10, "澎湃新闻": 8, "观察者网": 8,
       "腾讯新闻": 6, "腾讯科技": 6, "新浪新闻": 6, "网易新闻": 6, "知乎热榜": 7, "36氪": 7, "虎嗅": 7,
       "IT之家": 6, "搜狐新闻": 5, "少数派": 7, "掘金": 7, "凤凰网": 5, "财经网": 5, "第一财经": 5,
-      "参考消息": 6, "环球时报": 6, "RadarAI": 8
+      "参考消息": 6, "环球时报": 6, "RadarAI": 8,
+      "微博热搜": 6, "百度热搜": 6, "Bilibili热搜": 5, "抖音热搜": 5, "即刻热榜": 6,
+      "GitHub趋势": 7, "ProductHunt": 6, "HackerNews": 7, "Reddit编程": 7, "Stack Overflow": 6,
+      "Bilibili": 6
     }
   };
 
@@ -156,6 +180,40 @@
       } catch (e) { console.warn("网页解析失败:", sourceName, e); }
       return news;
     },
+    parseBilibili: (data, sourceName) => {
+      const news = [];
+      try {
+        const json = JSON.parse(data);
+        (json.data?.list || []).forEach(item => {
+          if (item.title) {
+            news.push({
+              title: item.title,
+              link: item.short_link_v2 || "https://www.bilibili.com/video/" + item.bvid,
+              date: Utils.formatDate(item.pubdate * 1000),
+              source: sourceName
+            });
+          }
+        });
+      } catch (e) { console.warn("Bilibili解析失败:", sourceName, e); }
+      return news;
+    },
+    parse36kr: (data, sourceName) => {
+      const news = [];
+      try {
+        const json = JSON.parse(data);
+        (json.data?.items || []).forEach(item => {
+          if (item.title) {
+            news.push({
+              title: item.title,
+              link: item.news_url || "https://36kr.com/p/" + item.id,
+              date: Utils.formatDate(item.published_at),
+              source: sourceName
+            });
+          }
+        });
+      } catch (e) { console.warn("36kr解析失败:", sourceName, e); }
+      return news;
+    },
     parse: (data, sourceName, type) => {
       switch (type) {
         case "json": return Parser.parseJSON(data, sourceName);
@@ -173,22 +231,75 @@
       let statusEl = UI.getStatusEl();
       statusEl.textContent = "🔄 抓取中 0/" + allFeeds.length + "...";
 
+      const fallback = (primaryType) => {
+        const all = ["rss", "json", "webpage"];
+        return all.filter(t => t !== primaryType);
+      };
+
+      const tryApiEndpoint = async (feedName) => {
+        for (const [apiName, apiConfig] of Object.entries(Config.API_ENDPOINTS)) {
+          if (feedName.includes(apiName) || apiName.includes(feedName)) {
+            try {
+              const data = await Utils.httpReq(apiConfig.url);
+              if (!data || data.length < 10) continue;
+              let parsed = [];
+              if (apiName === "Bilibili") parsed = Parser.parseBilibili(data, feedName);
+              else if (apiName === "36氪") parsed = Parser.parse36kr(data, feedName);
+              else parsed = Parser.parse(data, feedName, apiConfig.type);
+              if (parsed.length > 0) {
+                console.log(feedName + ": API(" + apiName + ")成功");
+                return parsed;
+              }
+            } catch (e) { continue; }
+          }
+        }
+        return [];
+      };
+
       for (let i = 0; i < allFeeds.length; i++) {
         const feed = allFeeds[i];
         statusEl.textContent = "🔄 抓取中 " + (i + 1) + "/" + allFeeds.length + "...";
+        const primaryType = feed.type || "rss";
+        let parsed = [];
+
         try {
           const data = await Utils.httpReq(feed.url);
-          if (!data || data.length < 10) {
-            console.warn(feed.name + ": 空响应或数据过短");
-            continue;
+          if (data && data.length >= 10) {
+            parsed = Parser.parse(data, feed.name, primaryType);
+            if (parsed.length > 0) {
+              console.log(feed.name + ": " + primaryType + "成功");
+              successCount++;
+            }
           }
-          const parsed = Parser.parse(data, feed.name, feed.type || "rss");
-          if (parsed.length === 0) {
-            console.warn(feed.name + ": 解析成功但无新闻，可能RSS格式异常");
+        } catch (e) { console.warn(feed.name + ": " + primaryType + "失败") }
+
+        if (parsed.length === 0) {
+          for (const type of fallback(primaryType)) {
+            try {
+              const data = await Utils.httpReq(feed.url);
+              if (!data || data.length < 10) continue;
+              parsed = Parser.parse(data, feed.name, type);
+              if (parsed.length > 0) {
+                console.log(feed.name + ": " + primaryType + "失败→" + type + "成功");
+                successCount++;
+                break;
+              }
+            } catch (e) { continue; }
           }
+        }
+
+        if (parsed.length === 0) {
+          parsed = await tryApiEndpoint(feed.name);
+          if (parsed.length > 0) {
+            successCount++;
+          }
+        }
+
+        if (parsed.length > 0) {
           news.push(...parsed);
-          successCount++;
-        } catch (e) { console.error(feed.name + " 抓取失败:", e.message); }
+        } else {
+          console.error(feed.name + ": 所有方式均失败");
+        }
       }
 
       news.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
@@ -243,8 +354,23 @@
   };
 
   const Downloader = {
-    downloadText: (content, fileName) => {
+    dirHandle: null,
+    downloadText: async (content, fileName) => {
       const blob = new Blob(["\uFEFF" + content], { type: "text/plain;charset=utf-8" });
+
+      if (window.showDirectoryPicker && Downloader.dirHandle) {
+        try {
+          const fileHandle = await Downloader.dirHandle.getFileHandle(fileName, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          Utils.notify("下载成功", fileName);
+          return;
+        } catch (e) {
+          console.warn("File System Access API 失败:", e);
+        }
+      }
+
       const url = URL.createObjectURL(blob);
       GM_download({
         url: url,
@@ -256,6 +382,22 @@
         },
         onerror: () => Utils.notify("下载失败", "请重试")
       });
+    },
+    selectFolder: async () => {
+      if (window.showDirectoryPicker) {
+        try {
+          Downloader.dirHandle = await window.showDirectoryPicker();
+          Utils.notify("已选择文件夹", "下载将保存到: " + Downloader.dirHandle.name);
+          Storage.set("downloadFolder", Downloader.dirHandle.name);
+          return true;
+        } catch (e) {
+          console.warn("选择文件夹取消:", e);
+          return false;
+        }
+      } else {
+        Utils.notify("不支持", "您的浏览器不支持文件夹选择功能");
+        return false;
+      }
     }
   };
 
@@ -584,11 +726,25 @@
 
     showFolderModal: () => {
       const overlay = GM_addElement("div", { class: "nc-modal-overlay" });
+      const folderName = Storage.get("downloadFolder") || "";
       overlay.innerHTML = `
         <div class="nc-modal">
           <h3>📂 修改导出位置</h3>
-          <input type="text" id="nc-folder-input" value="${State.folder}" placeholder="导出文件夹路径">
-          <div class="nc-modal-btns">
+          <p style="color:#888;font-size:12px;margin-bottom:10px">设置导出文件的文件夹名称</p>
+          <input type="text" id="nc-folder-input" value="${State.folder}" placeholder="如：新闻日报">
+          <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+            <button class="nc-btn" id="nc-folder-doc" style="padding:6px 10px;font-size:11px">📄 Documents</button>
+            <button class="nc-btn" id="nc-folder-desk" style="padding:6px 10px;font-size:11px">🖥️ Desktop</button>
+            <button class="nc-btn" id="nc-folder-down" style="padding:6px 10px;font-size:11px">📥 Downloads</button>
+          </div>
+          <hr style="border:none;border-top:1px solid #eee;margin:12px 0">
+          <p style="color:#888;font-size:12px;margin-bottom:8px">🎯 指定下载文件夹（推荐）</p>
+          <p style="color:#aaa;font-size:11px;margin-bottom:8px">选择后，每次下载会直接保存到指定文件夹，无需选择位置</p>
+          <button class="nc-btn nc-btn-primary" id="nc-select-folder" style="margin-bottom:8px">
+            ${folderName ? "📁 已选择: " + folderName : "📂 选择下载文件夹"}
+          </button>
+          <p style="color:#aaa;font-size:10px">⚠️ 仅 Chrome/Edge 等 Chromium 浏览器支持</p>
+          <div class="nc-modal-btns" style="margin-top:14px">
             <button class="nc-modal-cancel" id="nc-folder-cancel">取消</button>
             <button class="nc-modal-confirm" id="nc-folder-confirm">保存</button>
           </div>
@@ -596,15 +752,24 @@
       `;
       document.body.appendChild(overlay);
 
+      const input = overlay.querySelector("#nc-folder-input");
+      overlay.querySelector("#nc-folder-doc").addEventListener("click", () => { input.value = "Documents/新闻日报"; });
+      overlay.querySelector("#nc-folder-desk").addEventListener("click", () => { input.value = "Desktop/新闻日报"; });
+      overlay.querySelector("#nc-folder-down").addEventListener("click", () => { input.value = "Downloads/新闻日报"; });
+      overlay.querySelector("#nc-select-folder").addEventListener("click", async () => {
+        const success = await Downloader.selectFolder();
+        if (success) {
+          const folder = Storage.get("downloadFolder") || "";
+          overlay.querySelector("#nc-select-folder").textContent = folder ? "📁 已选择: " + folder : "📂 选择下载文件夹";
+        }
+      });
       overlay.querySelector("#nc-folder-cancel").addEventListener("click", () => overlay.remove());
       overlay.querySelector("#nc-folder-confirm").addEventListener("click", () => {
-        const folder = overlay.querySelector("#nc-folder-input").value.trim();
-        if (folder) {
-          Storage.setFolder(folder);
-          UI.updateStats();
-          Utils.notify("已保存", "导出位置: " + folder);
-          overlay.remove();
-        }
+        const folder = input.value.trim() || "新闻日报";
+        Storage.setFolder(folder);
+        UI.updateStats();
+        Utils.notify("已保存", "文件名: " + folder);
+        overlay.remove();
       });
       overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
       overlay.classList.add("active");
