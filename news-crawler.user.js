@@ -69,9 +69,9 @@
       <div class="nc-head">
         <h1>📰 新闻日报</h1>
         <div style="display:flex;gap:6px">
-          <button id="op-" style="width:22px;height:22px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;cursor:pointer;font-size:12px">-</button>
+          <button id="op-minus" style="width:22px;height:22px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;cursor:pointer;font-size:12px">-</button>
           <span id="op-text" style="color:#fff;font-size:11px;min-width:36px;text-align:center">90%</span>
-          <button id="op+" style="width:22px;height:22px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;cursor:pointer;font-size:12px">+</button>
+          <button id="op-plus" style="width:22px;height:22px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;cursor:pointer;font-size:12px">+</button>
           <button id="close" style="width:22px;height:22px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;cursor:pointer;font-size:12px">×</button>
         </div>
       </div>
@@ -101,8 +101,8 @@
     sidebar.querySelector("#start").onclick = startAll;
     sidebar.querySelector("#fetchOnly").onclick = fetchNews;
     sidebar.querySelector("#reportOnly").onclick = makeReport;
-    sidebar.querySelector("#op-").onclick = () => changeOpacity(-10);
-    sidebar.querySelector("#op+").onclick = () => changeOpacity(10);
+    sidebar.querySelector("#op-minus").onclick = () => changeOpacity(-10);
+    sidebar.querySelector("#op-plus").onclick = () => changeOpacity(10);
     sidebar.querySelector("#editFolderBtn").onclick = editFolder;
     sidebar.querySelector("#addFeed").onclick = addFeed;
 
