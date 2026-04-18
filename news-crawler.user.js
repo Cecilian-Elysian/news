@@ -119,16 +119,16 @@
     const list = panel.querySelector(".nc-list");
     list.innerHTML = '<div class="nc-tip">🔄 抓取中...</div>';
     const news = [];
-    let i = 0;
+    let idx = 0;
     function next() {
-      if (i >= FEEDS.length) {
+      if (idx >= FEEDS.length) {
         news.sort((a, b) => new Date(b.d) - new Date(a.d));
         GM_setValue("news", news);
         GM_notification({ title: "完成", text: `获取 ${news.length} 条新闻`, silent: true });
         show();
         return;
       }
-      const f = FEEDS[i++];
+      const f = FEEDS[idx++];
       GM_xmlhttpRequest({
         method: "GET", url: f.u, timeout: 10000,
         onload: r => {
@@ -136,14 +136,20 @@
             if (f.t === "j") {
               const d = JSON.parse(r.responseText);
               (d.result?.data || []).forEach(it => {
-                if (it.title || it.titleTxt) news.push({ t: it.title || it.titleTxt, l: it.url || "", d: fmt(it.ctime > 1e12 ? it.ctime : it.ctime * 1000) || "", s: f.n });
+                if (it.title || it.titleTxt) {
+                  let ct = it.ctime;
+                  if (ct) ct = ct > 1e12 ? ct : ct * 1000;
+                  news.push({ t: it.title || it.titleTxt, l: it.url || "", d: fmt(ct) || "", s: f.n });
+                }
               });
             } else {
               const p = new DOMParser().parseFromString(r.responseText, "text/xml");
               if (!p.querySelector("parsererror")) {
                 p.querySelectorAll("item, entry").forEach(it => {
                   const t = it.querySelector("title")?.textContent?.trim();
-                  if (t) news.push({ t, l: it.querySelector("link")?.getAttribute("href") || it.querySelector("link")?.textContent?.trim() || "", d: fmt(it.querySelector("pubDate, published")?.textContent?.trim() || ""), s: f.n });
+                  const l = it.querySelector("link")?.getAttribute("href") || it.querySelector("link")?.textContent?.trim() || "";
+                  const dd = it.querySelector("pubDate")?.textContent?.trim() || it.querySelector("published")?.textContent?.trim() || "";
+                  if (t) news.push({ t, l, d: fmt(dd), s: f.n });
                 });
               }
             }
