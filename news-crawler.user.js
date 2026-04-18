@@ -38,7 +38,7 @@
 
   function init() {
     GM_addStyle(`
-      .nc-sidebar{position:fixed;top:0;left:0;width:280px;height:100vh;background:#fff;box-shadow:2px 0 16px rgba(0,0,0,.1);z-index:2147483646;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+      .nc-sidebar{position:fixed;top:0;right:0;width:280px;height:100vh;background:#fff;box-shadow:-2px 0 16px rgba(0,0,0,.1);z-index:2147483646;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
       .nc-head{height:60px;padding:0 16px;background:linear-gradient(135deg,#4a9eff,#6b5bff);display:flex;align-items:center;justify-content:space-between}
       .nc-head h1{margin:0;font-size:16px;color:#fff;font-weight:600}
       .nc-head button{width:28px;height:28px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;cursor:pointer;font-size:14px}
@@ -53,13 +53,15 @@
       .nc-btn.primary:hover{background:#3a8eef}
       .nc-btn:active{transform:scale(.98)}
       .nc-status{padding:10px;background:#f0f7ff;border-radius:6px;font-size:11px;color:#666;margin-bottom:12px}
-      .nc-list{border-top:1px solid #eee;padding-top:12px}
+      .nc-list{border-top:1px solid #eee;padding-top:12px;flex:1;overflow-y:auto}
       .nc-list h3{font-size:12px;color:#888;margin:0 0 8px;font-weight:500}
-      .nc-item{padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:12px;cursor:pointer}
-      .nc-item:hover{color:#4a9eff}
+      .nc-item{padding:8px;border-bottom:1px solid #f5f5f5;font-size:12px;cursor:pointer}
+      .nc-item:hover{background:#f5f7ff}
       .nc-item:last-child{border:none}
       .nc-item-title{color:#333;line-height:1.4;margin-bottom:2px}
       .nc-item-src{font-size:10px;color:#aaa}
+      .nc-group{margin-bottom:12px}
+      .nc-group-title{padding:6px 8px;background:#f5f5f5;font-size:11px;font-weight:600;color:#666;border-radius:4px;margin-bottom:4px}
     `);
 
     sidebar = GM_addElement("div", { class: "nc-sidebar" });
@@ -94,7 +96,7 @@
     sidebar.querySelector("#reportOnly").onclick = makeReport;
 
     const floatBtn = GM_addElement("div", {
-      style: "position:fixed;bottom:20px;left:300px;width:48px;height:48px;background:linear-gradient(135deg,#4a9eff,#6b5bff);border-radius:50%;box-shadow:0 4px 16px rgba(74,158,255,.4);cursor:pointer;z-index:2147483645;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff",
+      style: "position:fixed;bottom:20px;right:20px;width:48px;height:48px;background:linear-gradient(135deg,#4a9eff,#6b5bff);border-radius:50%;box-shadow:0 4px 16px rgba(74,158,255,.4);cursor:pointer;z-index:2147483645;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff",
       innerHTML: "📰"
     });
     floatBtn.onclick = () => sidebar.style.display = sidebar.style.display === "none" ? "flex" : "none";
@@ -125,13 +127,23 @@
   }
 
   function updateList() {
-    const d = get().slice(0, 20);
+    const d = get();
     const el = sidebar.querySelector("#newsList");
     if (!d.length) {
       el.innerHTML = '<div style="color:#999;font-size:12px;text-align:center;padding:20px">暂无新闻</div>';
       return;
     }
-    el.innerHTML = d.map(i => `<div class="nc-item" onclick="window.open('${i.l || "#"}','_blank')"><div class="nc-item-title">${i.t}</div><div class="nc-item-src">${i.s} · ${i.d || ""}</div></div>`).join("");
+    const g = {};
+    d.forEach(i => { (g[i.s] = g[i.s] || []).push(i); });
+    let h = "";
+    Object.keys(g).sort().forEach(src => {
+      h += `<div class="nc-group"><div class="nc-group-title">${src} (${g[src].length})</div>`;
+      g[src].forEach(i => {
+        h += `<div class="nc-item" onclick="window.open('${i.l || "#"}','_blank')"><div class="nc-item-title">${i.t}</div><div class="nc-item-src">${i.d || ""}</div></div>`;
+      });
+      h += "</div>";
+    });
+    el.innerHTML = h;
   }
 
   async function fetchNews() {
