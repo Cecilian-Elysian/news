@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      0.3.0
+// @version      0.4.0
 // @description  爬取新闻网站的 RSS 订阅源，支持定时更新和导出为 Markdown
 // @author       You
 // @match        *://*/*
@@ -115,26 +115,60 @@
     return doc;
   }
 
+  function getTextContent(parent, tagNames) {
+    for (const tag of tagNames) {
+      const el = parent.querySelector(tag);
+      if (el) {
+        return el.textContent?.trim() || "";
+      }
+    }
+    return "";
+  }
+
+  function getLink(item) {
+    const linkEl = item.querySelector("link");
+    if (linkEl) {
+      const href = linkEl.getAttribute("href");
+      if (href) return href;
+      return linkEl.textContent?.trim() || "";
+    }
+    const enclosure = item.querySelector("enclosure");
+    if (enclosure) {
+      const url = enclosure.getAttribute("url");
+      if (url) return url;
+    }
+    return "";
+  }
+
+  function parseDate(dateStr) {
+    if (!dateStr) return "";
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleString("zh-CN");
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
   function extractNewsFromXML(doc, sourceName) {
     const items = [];
-    const entries = doc.querySelectorAll("item");
+    const entries = doc.querySelectorAll("item, entry");
+    if (entries.length === 0) {
+      console.log(`[新闻爬取器] ${sourceName}: 未找到 item/entry 节点`);
+      return items;
+    }
     entries.forEach((item) => {
-      const title = item.querySelector("title")?.textContent?.trim() || "";
-      const link = item.querySelector("link")?.textContent?.trim() || "";
-      const description = item.querySelector("description")?.textContent?.trim() || "";
-      const pubDateStr = item.querySelector("pubDate")?.textContent?.trim() || "";
-      let pubDate = "";
-      try {
-        pubDate = pubDateStr ? new Date(pubDateStr).toLocaleString("zh-CN") : "";
-      } catch (e) {
-        pubDate = pubDateStr;
-      }
+      const title = getTextContent(item, ["title"]);
+      const link = getLink(item);
+      const description = getTextContent(item, ["description", "summary", "content", "summary"]);
+      const pubDateStr = getTextContent(item, ["pubDate", "published", "updated", "created", "dc:date"]);
       if (title) {
         items.push({
           title,
           link,
           description: description.replace(/<[^>]+>/g, "").substring(0, 200),
-          pubDate,
+          pubDate: parseDate(pubDateStr),
           source: sourceName,
           crawledAt: Date.now(),
         });
@@ -145,24 +179,25 @@
 
   function extractNewsFromJSON(jsonObj, sourceName) {
     const items = [];
-    const list = jsonObj.result?.data || jsonObj.items || jsonObj.articles || [];
+    const list = jsonObj.result?.data || jsonObj.items || jsonObj.articles || jsonObj.list || jsonObj.data || [];
+    if (!Array.isArray(list) || list.length === 0) {
+      console.log(`[新闻爬取器] ${sourceName}: JSON 中未找到数据数组`);
+      return items;
+    }
     list.forEach((item) => {
-      const title = item.title || item.titleTxt || "";
-      const link = item.url || item.link || item.rawUrl || "";
-      const description = item.intro || item.description || item.digest || item.abstract || "";
-      const pubDateStr = item.ctime || item.pubDate || item.publish_time || "";
-      let pubDate = "";
-      try {
-        pubDate = pubDateStr ? new Date(pubDateStr * 1000).toLocaleString("zh-CN") : "";
-      } catch (e) {
-        pubDate = pubDateStr;
+      const title = item.title || item.titleTxt || item.wap_title || "";
+      const link = item.url || item.link || item.rawUrl || item.article_url || "";
+      const description = item.intro || item.description || item.digest || item.abstract || item.summary || "";
+      let pubDateStr = item.ctime || item.pubDate || item.publish_time || item.publishDate || item.date || "";
+      if (typeof pubDateStr === "number") {
+        pubDateStr = pubDateStr > 1e12 ? pubDateStr : pubDateStr * 1000;
       }
       if (title) {
         items.push({
           title,
           link,
           description: description.substring(0, 200),
-          pubDate,
+          pubDate: parseDate(pubDateStr),
           source: sourceName,
           crawledAt: Date.now(),
         });
@@ -174,15 +209,20 @@
   async function fetchSingleFeed(feed) {
     try {
       const { data, type } = await fetchFeed(feed.url, feed.type || type);
+      console.log(`[新闻爬取器] ${feed.name}: 获取到 ${data.length} 字节`);
       if (type === "json" || feed.type === "json") {
         const jsonObj = JSON.parse(data);
-        return extractNewsFromJSON(jsonObj, feed.name);
+        const items = extractNewsFromJSON(jsonObj, feed.name);
+        console.log(`[新闻爬取器] ${feed.name}: 解析出 ${items.length} 条`);
+        return items;
       } else {
         const doc = parseXML(data);
-        return extractNewsFromXML(doc, feed.name);
+        const items = extractNewsFromXML(doc, feed.name);
+        console.log(`[新闻爬取器] ${feed.name}: 解析出 ${items.length} 条`);
+        return items;
       }
     } catch (error) {
-      console.error(`[新闻爬取器] 获取 ${feed.name} 失败:`, error.message);
+      console.error(`[新闻爬取器] ${feed.name} 失败:`, error.message);
       return [];
     }
   }
