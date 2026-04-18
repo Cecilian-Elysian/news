@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      0.6.0
+// @version      0.7.0
 // @description  爬取新闻网站的 RSS 订阅源，支持定时更新和导出为 Markdown
 // @author       You
 // @match        *://*/*
@@ -113,9 +113,219 @@
   };
 
   // 初始化
+  const SETUP_KEY = "news_crawler_setup_done";
+
   function init() {
     registerMenuCommands();
+    const isSetupDone = GM_getValue(SETUP_KEY, false);
+    if (!isSetupDone) {
+      showSetupWizard();
+    }
     console.log("[新闻爬取器] 初始化完成");
+  }
+
+  // 首次设置向导
+  function showSetupWizard() {
+    const styles = `
+      .nc-setup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .nc-setup-panel {
+        width: 500px;
+        max-height: 80vh;
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        overflow: hidden;
+      }
+      .nc-setup-header {
+        padding: 20px 24px;
+        background: linear-gradient(135deg, #4a9eff, #6b5bff);
+        color: #fff;
+      }
+      .nc-setup-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 4px 0;
+      }
+      .nc-setup-subtitle {
+        font-size: 12px;
+        opacity: 0.9;
+        margin: 0;
+      }
+      .nc-setup-body {
+        padding: 20px 24px;
+        max-height: 50vh;
+        overflow-y: auto;
+      }
+      .nc-setup-section {
+        margin-bottom: 16px;
+      }
+      .nc-setup-section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 10px;
+      }
+      .nc-setup-presets {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+      .nc-setup-preset {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        background: #f5f7fa;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .nc-setup-preset:hover {
+        background: #e8f0fe;
+      }
+      .nc-setup-preset.selected {
+        background: #e8f0fe;
+        border-color: #4a9eff;
+      }
+      .nc-setup-preset input {
+        margin-right: 8px;
+        width: 16px;
+        height: 16px;
+      }
+      .nc-setup-preset-info {
+        flex: 1;
+      }
+      .nc-setup-preset-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: #333;
+      }
+      .nc-setup-preset-count {
+        font-size: 11px;
+        color: #888;
+      }
+      .nc-setup-footer {
+        padding: 16px 24px;
+        background: #f5f7fa;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+      .nc-setup-btn {
+        padding: 10px 24px;
+        font-size: 14px;
+        font-weight: 500;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .nc-setup-btn-skip {
+        background: #fff;
+        color: #666;
+        border: 1px solid #ddd;
+      }
+      .nc-setup-btn-skip:hover {
+        background: #f0f0f0;
+      }
+      .nc-setup-btn-add {
+        background: linear-gradient(135deg, #4a9eff, #6b5bff);
+        color: #fff;
+      }
+      .nc-setup-btn-add:hover {
+        opacity: 0.9;
+      }
+    `;
+    GM_addStyle(styles);
+
+    const presets = [
+      { key: "中央重点", name: "🏛️ 中央重点", desc: "人民日报、新华网、央视网等", count: 7 },
+      { key: "央媒新闻", name: "📰 央媒新闻", desc: "人民网、中国日报、国际在线等", count: 6 },
+      { key: "商业门户", name: "💼 商业门户", desc: "新浪、腾讯、网易、搜狐", count: 4 },
+      { key: "科技资讯", name: "🔬 科技资讯", desc: "知乎、36氪、少数派、澎湃", count: 4 },
+      { key: "热榜聚合", name: "🌐 热榜聚合", desc: "RadarAI、今日热榜", count: 2 },
+      { key: "学习强国", name: "📚 学习强国", desc: "学习强国平台", count: 1 },
+    ];
+
+    const overlay = document.createElement("div");
+    overlay.className = "nc-setup-overlay";
+    overlay.innerHTML = `
+      <div class="nc-setup-panel">
+        <div class="nc-setup-header">
+          <h2 class="nc-setup-title">📰 欢迎使用新闻爬取器</h2>
+          <p class="nc-setup-subtitle">选择要添加的新闻源预设（可多选）</p>
+        </div>
+        <div class="nc-setup-body">
+          <div class="nc-setup-presets">
+            ${presets.map(p => `
+              <label class="nc-setup-preset">
+                <input type="checkbox" value="${p.key}" checked>
+                <div class="nc-setup-preset-info">
+                  <div class="nc-setup-preset-name">${p.name}</div>
+                  <div class="nc-setup-preset-count">${p.desc}</div>
+                </div>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+        <div class="nc-setup-footer">
+          <button class="nc-setup-btn nc-setup-btn-skip" id="nc-skip-setup">稍后添加</button>
+          <button class="nc-setup-btn nc-setup-btn-add" id="nc-add-presets">添加选定源</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll(".nc-setup-preset").forEach(el => {
+      el.addEventListener("click", (e) => {
+        if (e.target.tagName !== "INPUT") {
+          const cb = el.querySelector("input");
+          cb.checked = !cb.checked;
+          el.classList.toggle("selected", cb.checked);
+        }
+      });
+    });
+
+    overlay.querySelector("#nc-skip-setup").addEventListener("click", () => {
+      GM_setValue(SETUP_KEY, true);
+      GM_setValue(FEEDS_KEY, []);
+      overlay.remove();
+    });
+
+    overlay.querySelector("#nc-add-presets").addEventListener("click", () => {
+      const selected = Array.from(overlay.querySelectorAll("input:checked")).map(cb => cb.value);
+      let allFeeds = [];
+      selected.forEach(key => {
+        const preset = FEED_PRESETS[key];
+        if (preset) {
+          allFeeds = allFeeds.concat(preset);
+        }
+      });
+      const existingUrls = new Set(allFeeds.map(f => f.url));
+      const uniqueFeeds = allFeeds.filter((feed, index, self) =>
+        index === self.findIndex(f => f.url === feed.url)
+      );
+      GM_setValue(FEEDS_KEY, uniqueFeeds);
+      GM_setValue(SETUP_KEY, true);
+      GM_notification({
+        title: "设置完成",
+        text: `已添加 ${uniqueFeeds.length} 个新闻源`,
+        silent: true,
+      });
+      overlay.remove();
+      fetchAllFeeds();
+    });
   }
 
   // 注册菜单命令
