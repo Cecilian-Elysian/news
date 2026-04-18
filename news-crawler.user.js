@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      0.7.0
+// @version      0.8.0
 // @description  爬取新闻网站的 RSS 订阅源，支持定时更新和导出为 Markdown
 // @author       You
 // @match        *://*/*
@@ -114,14 +114,174 @@
 
   // 初始化
   const SETUP_KEY = "news_crawler_setup_done";
+  const AUTO_FETCH_KEY = "news_crawler_auto_fetch";
 
   function init() {
     registerMenuCommands();
+    createFloatingButton();
     const isSetupDone = GM_getValue(SETUP_KEY, false);
     if (!isSetupDone) {
       showSetupWizard();
+    } else {
+      if (GM_getValue(AUTO_FETCH_KEY, true)) {
+        setTimeout(() => fetchAllFeeds(), 2000);
+      }
     }
     console.log("[新闻爬取器] 初始化完成");
+  }
+
+  // 悬浮按钮
+  let fabElement = null;
+  let fabMenuVisible = false;
+
+  function createFloatingButton() {
+    const styles = `
+      .nc-fab {
+        position: fixed;
+        bottom: 24px;
+        left: 24px;
+        width: 56px;
+        height: 56px;
+        background: linear-gradient(135deg, #4a9eff, #6b5bff);
+        border-radius: 50%;
+        box-shadow: 0 4px 20px rgba(74, 158, 255, 0.4);
+        cursor: pointer;
+        z-index: 2147483646;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+      }
+      .nc-fab:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 25px rgba(74, 158, 255, 0.5);
+      }
+      .nc-fab-icon {
+        font-size: 24px;
+        color: #fff;
+      }
+      .nc-fab-menu {
+        position: fixed;
+        bottom: 90px;
+        left: 24px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        z-index: 2147483647;
+        overflow: hidden;
+        display: none;
+        min-width: 160px;
+      }
+      .nc-fab-menu.show {
+        display: block;
+        animation: ncFadeIn 0.2s ease;
+      }
+      @keyframes ncFadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .nc-fab-item {
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-size: 13px;
+        color: #333;
+      }
+      .nc-fab-item:hover {
+        background: #f5f7fa;
+      }
+      .nc-fab-item-icon {
+        margin-right: 10px;
+        font-size: 16px;
+      }
+      .nc-fab-badge {
+        position: fixed;
+        bottom: 70px;
+        left: 70px;
+        background: #ff4d4d;
+        color: #fff;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        z-index: 2147483647;
+        display: none;
+      }
+    `;
+    GM_addStyle(styles);
+
+    fabElement = document.createElement("div");
+    fabElement.innerHTML = `
+      <div class="nc-fab-menu" id="nc-fab-menu">
+        <div class="nc-fab-item" id="nc-fab-view">📰 查看新闻</div>
+        <div class="nc-fab-item" id="nc-fab-refresh">🔄 立即刷新</div>
+        <div class="nc-fab-item" id="nc-fab-export">📥 导出MD</div>
+        <div class="nc-fab-item" id="nc-fab-config">⚙️ 配置源</div>
+      </div>
+      <div class="nc-fab-badge" id="nc-badge">0</div>
+      <div class="nc-fab">
+        <span class="nc-fab-icon">📰</span>
+      </div>
+    `;
+    document.body.appendChild(fabElement);
+
+    fabElement.querySelector(".nc-fab").addEventListener("click", (e) => {
+      e.stopPropagation();
+      fabMenuVisible = !fabMenuVisible;
+      fabElement.querySelector("#nc-fab-menu").classList.toggle("show", fabMenuVisible);
+    });
+
+    fabElement.querySelector("#nc-fab-view").addEventListener("click", (e) => {
+      e.stopPropagation();
+      fabMenuVisible = false;
+      fabElement.querySelector("#nc-fab-menu").classList.remove("show");
+      showNewsPanel();
+    });
+
+    fabElement.querySelector("#nc-fab-refresh").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      fabMenuVisible = false;
+      fabElement.querySelector("#nc-fab-menu").classList.remove("show");
+      await fetchAllFeeds();
+      updateBadge();
+    });
+
+    fabElement.querySelector("#nc-fab-export").addEventListener("click", (e) => {
+      e.stopPropagation();
+      fabMenuVisible = false;
+      fabElement.querySelector("#nc-fab-menu").classList.remove("show");
+      exportToMarkdown();
+    });
+
+    fabElement.querySelector("#nc-fab-config").addEventListener("click", (e) => {
+      e.stopPropagation();
+      fabMenuVisible = false;
+      fabElement.querySelector("#nc-fab-menu").classList.remove("show");
+      openFeedConfig();
+    });
+
+    document.addEventListener("click", () => {
+      if (fabMenuVisible) {
+        fabMenuVisible = false;
+        fabElement.querySelector("#nc-fab-menu").classList.remove("show");
+      }
+    });
+
+    updateBadge();
+  }
+
+  function updateBadge() {
+    const news = getNews();
+    const badge = fabElement?.querySelector("#nc-badge");
+    if (badge) {
+      if (news.length > 0) {
+        badge.textContent = news.length > 99 ? "99+" : news.length;
+        badge.style.display = "block";
+      } else {
+        badge.style.display = "none";
+      }
+    }
   }
 
   // 首次设置向导
@@ -487,6 +647,14 @@
   async function fetchAllFeeds() {
     console.log("[新闻爬取器] 开始抓取所有新闻源...");
     const feeds = getFeeds();
+    if (feeds.length === 0) {
+      GM_notification({
+        title: "新闻爬取",
+        text: "请先添加新闻源",
+        silent: true,
+      });
+      return [];
+    }
     const allNews = [];
     for (const feed of feeds) {
       const news = await fetchSingleFeed(feed);
@@ -495,6 +663,7 @@
     }
     allNews.sort((a, b) => b.crawledAt - a.crawledAt);
     saveNews(allNews);
+    updateBadge();
     GM_notification({
       title: "新闻爬取完成",
       text: `共获取 ${allNews.length} 条新闻`,
