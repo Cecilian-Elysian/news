@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/username/news-crawler
-// @version      1.1.0
-// @description  定时自动爬取新闻 RSS，后台每30分钟抓取，开机首日自动抓取
+// @version      2.0.0
+// @description  定时自动爬取新闻 RSS，每日8点生成总结报告并下载
 // @author       You
 // @background
 // @crontab      */30 * * * *
+// @crontab      0 20 * * *
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -26,20 +27,22 @@
   const FEEDS_KEY = "news_crawler_feeds";
   const VIEWER_KEY = "news_crawler_viewer";
   const LAST_DATE_KEY = "news_crawler_last_date";
+  const REPORT_KEY = "news_crawler_report";
+  const SETTINGS_KEY = "news_crawler_settings";
 
-  function getTodayStr() {
-    return new Date().toISOString().slice(0, 10);
-  }
+  const DEFAULT_SETTINGS = {
+    downloadFolder: "新闻日报",
+    topNewsCount: 3,
+    enableReport: true,
+  };
 
-  function isFirstOpenToday() {
-    const lastDate = GM_getValue(LAST_DATE_KEY, "");
-    const today = getTodayStr();
-    if (lastDate !== today) {
-      GM_setValue(LAST_DATE_KEY, today);
-      return true;
-    }
-    return false;
-  }
+  const SOURCE_PRIORITY = {
+    "人民日报": 10, "新华网": 10, "央视新闻": 10, "中国新闻网": 9,
+    "澎湃新闻": 8, "观察者网": 8, "环球时报": 7, "参考消息": 7,
+    "腾讯新闻": 6, "新浪新闻": 6, "网易新闻": 6, "搜狐新闻": 5,
+    "知乎热榜": 7, "36氪": 7, "虎嗅": 7, "IT之家": 6,
+    "观察者网": 8, "极客公园": 6, "爱范儿": 6,
+  };
 
   const DEFAULT_FEEDS = [
     { name: "新浪新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=50&page=1", type: "json" },
@@ -54,6 +57,28 @@
     { name: "澎湃新闻", url: "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2165&num=50&page=1", type: "json" },
   ];
 
+  function getTodayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function getSettings() {
+    return GM_getValue(SETTINGS_KEY) || DEFAULT_SETTINGS;
+  }
+
+  function saveSettings(settings) {
+    GM_setValue(SETTINGS_KEY, settings);
+  }
+
+  function isFirstOpenToday() {
+    const lastDate = GM_getValue(LAST_DATE_KEY, "");
+    const today = getTodayStr();
+    if (lastDate !== today) {
+      GM_setValue(LAST_DATE_KEY, today);
+      return true;
+    }
+    return false;
+  }
+
   function init() {
     registerMenuCommands();
     if (!GM_getValue(FEEDS_KEY)) {
@@ -61,16 +86,10 @@
     }
     const today = getTodayStr();
     if (isFirstOpenToday()) {
-      console.log("[新闻爬取器] 今日首次启动，开始抓取...");
-      GM_notification({
-        title: "📰 今日新闻推送",
-        text: "正在获取最新新闻...",
-        silent: true,
-      });
+      GM_notification({ title: "📰 今日新闻推送", text: "正在获取最新新闻...", silent: true });
       fetchAllFeeds();
-    } else {
-      console.log("[新闻爬取器] 已启动，后台每30分钟自动抓取");
     }
+    console.log("[新闻爬取器] 已启动");
   }
 
   function registerMenuCommands() {
@@ -78,7 +97,19 @@
     GM_registerMenuCommand("🔄 立即刷新", fetchAllFeeds);
     GM_registerMenuCommand("📥 导出 Markdown", exportToMarkdown);
     GM_registerMenuCommand("📊 新闻统计", showStats);
+    GM_registerMenuCommand("📑 生成日报", generateDailyReport);
+    GM_registerMenuCommand("⚙️ 设置", openSettings);
     GM_registerMenuCommand("🗑️ 清空数据", clearData);
+  }
+
+  function openSettings() {
+    const settings = getSettings();
+    const folder = prompt("下载文件夹名称:", settings.downloadFolder || "新闻日报");
+    if (folder !== null) {
+      settings.downloadFolder = folder || "新闻日报";
+      saveSettings(settings);
+      GM_notification({ title: "设置已保存", text: `下载文件夹: ${settings.downloadFolder}`, silent: true });
+    }
   }
 
   function fetchFeed(url, type) {
@@ -114,7 +145,7 @@
       const link = item.querySelector("link")?.getAttribute("href") || item.querySelector("link")?.textContent?.trim() || "";
       const desc = item.querySelector("description, summary, content")?.textContent?.trim() || "";
       const date = item.querySelector("pubDate, published, updated")?.textContent?.trim() || "";
-      if (title) items.push({ title, link, desc: desc.replace(/<[^>]+>/g, "").substring(0, 150), date: parseDate(date), source });
+      if (title) items.push({ title, link, desc: desc.replace(/<[^>]+>/g, "").substring(0, 150), date: parseDate(date), source, crawledAt: Date.now() });
     });
     return items;
   }
@@ -128,7 +159,7 @@
       const desc = item.intro || item.description || item.digest || "";
       let date = item.ctime || item.pubDate || item.publish_time || "";
       if (typeof date === "number") date = date > 1e12 ? date : date * 1000;
-      if (title) items.push({ title, link, desc: desc.substring(0, 150), date: parseDate(date), source });
+      if (title) items.push({ title, link, desc: desc.substring(0, 150), date: parseDate(date), source, crawledAt: Date.now() });
     });
     return items;
   }
@@ -139,6 +170,15 @@
       const d = new Date(str);
       return isNaN(d.getTime()) ? str : d.toLocaleString("zh-CN");
     } catch { return str; }
+  }
+
+  function parseDateForFilter(str) {
+    if (!str) return null;
+    try {
+      const d = new Date(str);
+      if (isNaN(d.getTime())) return null;
+      return d;
+    } catch { return null; }
   }
 
   async function fetchSingleFeed(feed) {
@@ -171,7 +211,7 @@
       }
       total++;
     }
-    allNews.sort((a, b) => b.date.localeCompare(a.date));
+    allNews.sort((a, b) => b.crawledAt - a.crawledAt);
     GM_setValue(STORAGE_KEY, { items: allNews, lastFetch: Date.now() });
     const msg = `成功 ${success}/${total} 个源，共 ${allNews.length} 条`;
     GM_notification({ title: "抓取完成", text: msg, silent: true });
@@ -182,6 +222,60 @@
   function getNews() {
     const data = GM_getValue(STORAGE_KEY);
     return data?.items || [];
+  }
+
+  function getTodayNews(news) {
+    const today = getTodayStr();
+    return news.filter(item => {
+      if (item.date) {
+        const itemDate = parseDateForFilter(item.date);
+        if (itemDate) {
+          return itemDate.toISOString().slice(0, 10) === today;
+        }
+      }
+      if (item.crawledAt) {
+        return new Date(item.crawledAt).toISOString().slice(0, 10) === today;
+      }
+      return false;
+    });
+  }
+
+  function scoreNewsImportance(item) {
+    let score = 0;
+    score += SOURCE_PRIORITY[item.source] || 5;
+    const title = item.title.toLowerCase();
+    const importantKeywords = ["重大", "首发", "独家", "刚刚", "最新", "重磅", "突发", "紧急", "曝光", "刚刚发布"];
+    importantKeywords.forEach(kw => { if (title.includes(kw)) score += 5; });
+    if (item.link && item.link.startsWith("http")) score += 2;
+    return score;
+  }
+
+  function selectTopNews(news, count = 3) {
+    return [...news]
+      .map(item => ({ ...item, importance: scoreNewsImportance(item) }))
+      .sort((a, b) => b.importance - a.importance)
+      .slice(0, count);
+  }
+
+  async function fetchFullArticle(url) {
+    if (!url || !url.startsWith("http")) return null;
+    try {
+      const { data } = await fetchFeed(url, "html");
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(data, "text/html");
+      const scripts = doc.querySelectorAll("script, style, nav, header, footer, aside, .ad, .advertisement, .comments, .related, .sidebar");
+      scripts.forEach(el => el.remove());
+      let content = doc.querySelector("article")?.textContent ||
+                   doc.querySelector(".article-content")?.textContent ||
+                   doc.querySelector(".article-body")?.textContent ||
+                   doc.querySelector("main")?.textContent ||
+                   doc.body.textContent;
+      content = content.replace(/\s+/g, " ").trim().substring(0, 5000);
+      return content || null;
+    } catch (e) {
+      console.log(`[新闻爬取器] 全文抓取失败: ${url}`);
+      return null;
+    }
   }
 
   function generateViewerHTML(news) {
@@ -232,18 +326,10 @@
       return;
     }
     const html = generateViewerHTML(news);
-    GM_setValue(VIEWER_KEY, html);
-    GM_openInTab("https://localhost/news-viewer", { active: true });
-    setTimeout(() => {
-      const saved = GM_getValue(VIEWER_KEY);
-      if (saved) {
-        const blob = new Blob([saved], { type: "text/html" });
-        const url = URL.createObjectURL(blob);
-        GM_openInTab(url, { active: true });
-        URL.revokeObjectURL(url);
-        GM_deleteValue(VIEWER_KEY);
-      }
-    }, 100);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    GM_openInTab(url, { active: true });
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
   function generateMarkdown(news) {
@@ -267,6 +353,106 @@
     return md;
   }
 
+  async function generateDailyReport() {
+    const settings = getSettings();
+    const allNews = getNews();
+    const todayNews = getTodayNews(allNews);
+
+    if (todayNews.length === 0) {
+      GM_notification({ title: "今日无新闻", text: "今日暂无抓取到新闻", silent: true });
+      return;
+    }
+
+    GM_notification({ title: "📑 生成日报", text: "正在生成今日新闻摘要...", silent: true });
+
+    const topNews = selectTopNews(todayNews, settings.topNewsCount || 3);
+    const topNewsContent = [];
+    for (const item of topNews) {
+      if (item.link) {
+        const content = await fetchFullArticle(item.link);
+        if (content) {
+          topNewsContent.push({ ...item, fullContent: content });
+        } else {
+          topNewsContent.push({ ...item, fullContent: item.desc || "（无详细内容）" });
+        }
+      } else {
+        topNewsContent.push({ ...item, fullContent: item.desc || "（无详细内容）" });
+      }
+    }
+
+    const today = getTodayStr();
+    const dateDisplay = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
+
+    let md = `# 📰 今日新闻日报\n\n`;
+    md += `> **日期**: ${dateDisplay}\n`;
+    md += `> **统计**: 今日共 ${todayNews.length} 条新闻，涵盖 ${Object.keys(todayNews.reduce((acc, n) => { acc[n.source] = 1; return acc; })).length} 个来源\n\n`;
+    md += `---\n\n`;
+
+    md += `## 📌 今日要闻 TOP ${topNewsContent.length}\n\n`;
+    topNewsContent.forEach((item, i) => {
+      md += `### ${i + 1}. ${item.title}\n\n`;
+      md += `- **来源**: ${item.source}\n`;
+      md += `- **时间**: ${item.date || "未知"}\n`;
+      md += `- **链接**: ${item.link || "无"}\n\n`;
+      md += `**正文摘要**:\n\n${item.fullContent.substring(0, 2000)}\n\n`;
+      if (item.fullContent.length > 2000) {
+        md += `...\n\n`;
+      }
+      md += `---\n\n`;
+    });
+
+    md += `## 📋 今日全部新闻\n\n`;
+    const grouped = {};
+    todayNews.forEach(item => {
+      const src = item.source || "未知";
+      (grouped[src] = grouped[src] || []).push(item);
+    });
+    Object.entries(grouped).forEach(([src, items]) => {
+      md += `### ${src} (${items.length})\n\n`;
+      items.forEach(item => {
+        const date = item.date ? ` *${item.date}*` : "";
+        md += `- [${item.title}](${item.link || "#"})${date}\n`;
+      });
+      md += "\n";
+    });
+
+    md += `\n---\n\n`;
+    md += `*本报告由新闻爬取器自动生成于 ${new Date().toLocaleString("zh-CN")}*\n`;
+
+    const folderName = settings.downloadFolder || "新闻日报";
+    const filename = `【${dateDisplay}】新闻日报.md`;
+
+    GM_setValue(REPORT_KEY, { md, filename, folderName });
+
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const finalFilename = `${folderName}/${filename}`;
+
+    GM_download({
+      url: url,
+      name: finalFilename,
+      saveAs: true,
+      onload: () => {
+        URL.revokeObjectURL(url);
+        GM_notification({
+          title: "📑 日报已生成",
+          text: `已保存: ${filename}`,
+          silent: true,
+        });
+      },
+      onerror: (err) => {
+        GM_notification({
+          title: "下载失败",
+          text: err.details || "请检查下载设置",
+          silent: true,
+        });
+      },
+    });
+
+    GM_setValue(STORAGE_KEY, { items: todayNews, lastFetch: Date.now() });
+    console.log("[新闻爬取器] 日报已生成并下载");
+  }
+
   function exportToMarkdown() {
     const news = getNews();
     const md = generateMarkdown(news);
@@ -281,16 +467,17 @@
 
   function showStats() {
     const news = getNews();
+    const todayNews = getTodayNews(news);
     const data = GM_getValue(STORAGE_KEY);
     const lastFetch = data?.lastFetch ? new Date(data.lastFetch).toLocaleString("zh-CN") : "从未";
     const grouped = {};
     news.forEach(item => { grouped[item.source] = (grouped[item.source] || 0) + 1; });
-    let stats = `📊 新闻统计\n\n共 ${news.length} 条新闻\n最后抓取: ${lastFetch}\n\n来源统计:\n`;
-    Object.entries(grouped).sort((a, b) => b[1] - a[1]).forEach(([src, cnt]) => {
-      stats += `${src}: ${cnt}条\n`;
+    GM_notification({
+      title: "📊 统计信息",
+      text: `总${news.length}条 | 今日${todayNews.length}条 | ${Object.keys(grouped).length}个源`,
+      silent: true,
     });
-    GM_notification({ title: "📊 统计信息", text: `共${news.length}条/${Object.keys(grouped).length}个源`, silent: true });
-    console.log("[新闻爬取器] " + stats);
+    console.log(`[新闻爬取器] 统计: 总${news.length}条, 今日${todayNews.length}条, ${Object.keys(grouped).length}个来源`);
   }
 
   function clearData() {
@@ -298,6 +485,12 @@
       GM_deleteValue(STORAGE_KEY);
       GM_notification({ title: "已清空", text: "所有新闻数据已删除", silent: true });
     }
+  }
+
+  const now = new Date();
+  if (now.getHours() === 20 && now.getMinutes() === 0) {
+    console.log("[新闻爬取器] 触发每日8点日报生成");
+    setTimeout(generateDailyReport, 5000);
   }
 
   init();
