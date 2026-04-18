@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.1.2
+// @version      2.1.3
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -571,10 +571,9 @@
     },
 
     createFloatingButton: () => {
-      const btn = GM_addElement("div", {
-        class: "nc-float-btn",
-        innerHTML: "📰"
-      });
+      const btn = document.createElement("div");
+      btn.className = "nc-float-btn";
+      btn.innerHTML = "📰";
       btn.addEventListener("click", () => {
         UI.sidebar.style.display = UI.sidebar.style.display === "none" ? "flex" : "none";
       });
