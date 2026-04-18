@@ -202,21 +202,86 @@
     return data?.items || [];
   }
 
-  // ========== 核心功能函数（待实现） ==========
+  // ========== Markdown 导出 ==========
+
+  function generateMarkdown(newsList) {
+    if (!newsList || newsList.length === 0) {
+      return "# 📰 新闻快报\n\n> 暂无新闻数据，请先点击「刷新新闻」抓取。\n";
+    }
+    const now = new Date().toLocaleString("zh-CN");
+    let md = `# 📰 新闻快报\n\n> 生成时间: ${now}  |  共 ${newsList.length} 条\n\n---\n\n`;
+    const grouped = {};
+    newsList.forEach((item) => {
+      const source = item.source || "未知来源";
+      if (!grouped[source]) {
+        grouped[source] = [];
+      }
+      grouped[source].push(item);
+    });
+    Object.entries(grouped).forEach(([source, items]) => {
+      md += `## 🔗 ${source}\n\n`;
+      items.forEach((item) => {
+        const date = item.pubDate ? ` - ${item.pubDate}` : "";
+        md += `- [${item.title}](${item.link})${date}\n`;
+        if (item.description) {
+          md += `  > ${item.description}\n`;
+        }
+      });
+      md += "\n";
+    });
+    md += "---\n\n*由新闻爬取器自动生成*\n";
+    return md;
+  }
+
+  function exportToMarkdown() {
+    const news = getNews();
+    const md = generateMarkdown(news);
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const filename = `新闻快报_${new Date().toISOString().slice(0, 10)}.md`;
+    GM_download({
+      url: url,
+      name: filename,
+      saveAs: true,
+      onload: () => {
+        URL.revokeObjectURL(url);
+        GM_notification({
+          title: "导出成功",
+          text: `已导出 ${news.length} 条新闻到 ${filename}`,
+          silent: true,
+        });
+      },
+      onerror: (err) => {
+        console.error("[新闻爬取器] 导出失败:", err);
+        GM_notification({
+          title: "导出失败",
+          text: err.details || "请重试",
+          silent: true,
+        });
+      },
+    });
+  }
+
+  function clearAllNews() {
+    if (confirm("确定要清空所有新闻数据吗？")) {
+      GM_deleteValue(STORAGE_KEY);
+      GM_notification({
+        title: "已清空",
+        text: "所有新闻数据已清除",
+        silent: true,
+      });
+      console.log("[新闻爬取器] 新闻数据已清空");
+    }
+  }
+
+  // ========== 浮窗 UI（待实现） ==========
   function showNewsPanel() {
     console.log("[新闻爬取器] 显示新闻面板");
   }
 
-  function exportToMarkdown() {
-    console.log("[新闻爬取器] 导出为 Markdown");
-  }
-
+  // ========== 用户配置（待实现） ==========
   function openFeedConfig() {
     console.log("[新闻爬取器] 打开配置面板");
-  }
-
-  function clearAllNews() {
-    console.log("[新闻爬取器] 清空新闻数据");
   }
 
   // 启动
