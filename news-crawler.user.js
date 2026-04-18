@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.0.3
+// @version      2.0.4
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -362,7 +362,7 @@
             <div class="nc-stat-card"><div class="nc-stat-num" id="nc-time">-</div><div class="nc-stat-label">最后更新</div></div>
             <div class="nc-stat-card"><div class="nc-stat-num" id="nc-folder" style="font-size:14px">📁</div><div class="nc-stat-label">导出位置</div></div>
           </div>
-          <div class="nc-status" id="nc-status">点击按钮开始抓取新闻</div>
+          <div class="nc-status" id="nc-status"></div>
           <div class="nc-btn-group">
             <button class="nc-btn nc-btn-primary" id="nc-start">🚀 一键抓取并生成日报</button>
             <button class="nc-btn" id="nc-fetch">🔄 仅抓取新闻</button>
