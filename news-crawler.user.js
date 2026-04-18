@@ -34,7 +34,7 @@
 
   const P = { "人民日报": 10, "新华网": 10, "央视新闻": 10, "澎湃新闻": 8, "观察者网": 8, "腾讯新闻": 6, "新浪新闻": 6, "网易新闻": 6, "知乎热榜": 7, "36氪": 7, "虎嗅": 7 };
 
-  let sidebar;
+  let sidebar, opacity = GM_getValue("opacity", 90);
 
   function init() {
     GM_addStyle(`
@@ -68,7 +68,12 @@
     sidebar.innerHTML = `
       <div class="nc-head">
         <h1>📰 新闻日报</h1>
-        <button id="close">×</button>
+        <div style="display:flex;gap:6px">
+          <button id="op-" style="width:22px;height:22px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;cursor:pointer;font-size:12px">-</button>
+          <span id="op-text" style="color:#fff;font-size:11px;min-width:36px;text-align:center">90%</span>
+          <button id="op+" style="width:22px;height:22px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;cursor:pointer;font-size:12px">+</button>
+          <button id="close" style="width:22px;height:22px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;cursor:pointer;font-size:12px">×</button>
+        </div>
       </div>
       <div class="nc-body">
         <div class="nc-status" id="status">点击按钮开始</div>
@@ -94,6 +99,8 @@
     sidebar.querySelector("#start").onclick = startAll;
     sidebar.querySelector("#fetchOnly").onclick = fetchNews;
     sidebar.querySelector("#reportOnly").onclick = makeReport;
+    sidebar.querySelector("#op-").onclick = () => changeOpacity(-10);
+    sidebar.querySelector("#op+").onclick = () => changeOpacity(10);
 
     const floatBtn = GM_addElement("div", {
       style: "position:fixed;bottom:20px;right:20px;width:48px;height:48px;background:linear-gradient(135deg,#4a9eff,#6b5bff);border-radius:50%;box-shadow:0 4px 16px rgba(74,158,255,.4);cursor:pointer;z-index:2147483645;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff",
@@ -103,6 +110,8 @@
     document.body.appendChild(floatBtn);
 
     updateStat();
+    sidebar.style.background = `rgba(255,255,255,${opacity/100})`;
+    sidebar.querySelector("#op-text").textContent = opacity + "%";
     GM_notification({ title: "📰 新闻日报已就绪", text: "点击按钮开始抓取", silent: true });
   }
 
@@ -110,6 +119,13 @@
   function set(arr) { GM_setValue("news", arr); }
   function folder() { return GM_getValue("folder") || "新闻日报"; }
   function fmt(s) { if (!s) return ""; try { const d = new Date(s); return isNaN(d.getTime()) ? s : d.toLocaleString("zh-CN"); } catch { return s; } }
+
+  function changeOpacity(delta) {
+    opacity = Math.max(30, Math.min(100, opacity + delta));
+    sidebar.style.background = `rgba(255,255,255,${opacity/100})`;
+    sidebar.querySelector("#op-text").textContent = opacity + "%";
+    GM_setValue("opacity", opacity);
+  }
 
   function setStatus(s) { sidebar.querySelector("#status").textContent = s; }
   function setCount(n) { sidebar.querySelector("#count").textContent = n; }
