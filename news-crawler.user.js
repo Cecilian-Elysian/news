@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.1.3
+// @version      2.2.0
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -226,10 +226,8 @@
   const Fetcher = {
     fetchAll: async () => {
       const allFeeds = Storage.getCustomFeeds();
-      const news = [];
-      let successCount = 0;
-      let statusEl = UI.getStatusEl();
-      statusEl.textContent = "🔄 抓取中 0/" + allFeeds.length + "...";
+      const statusEl = UI.getStatusEl();
+      statusEl.textContent = "🔄 并行抓取中...";
 
       const fallback = (primaryType) => {
         const all = ["rss", "json", "webpage"];
@@ -256,9 +254,7 @@
         return [];
       };
 
-      for (let i = 0; i < allFeeds.length; i++) {
-        const feed = allFeeds[i];
-        statusEl.textContent = "🔄 抓取中 " + (i + 1) + "/" + allFeeds.length + "...";
+      const fetchOne = async (feed) => {
         const primaryType = feed.type || "rss";
         let parsed = [];
 
@@ -268,7 +264,7 @@
             parsed = Parser.parse(data, feed.name, primaryType);
             if (parsed.length > 0) {
               console.log(feed.name + ": " + primaryType + "成功");
-              successCount++;
+              return parsed;
             }
           }
         } catch (e) { console.warn(feed.name + ": " + primaryType + "失败") }
@@ -281,8 +277,7 @@
               parsed = Parser.parse(data, feed.name, type);
               if (parsed.length > 0) {
                 console.log(feed.name + ": " + primaryType + "失败→" + type + "成功");
-                successCount++;
-                break;
+                return parsed;
               }
             } catch (e) { continue; }
           }
@@ -290,24 +285,24 @@
 
         if (parsed.length === 0) {
           parsed = await tryApiEndpoint(feed.name);
-          if (parsed.length > 0) {
-            successCount++;
-          }
         }
 
-        if (parsed.length > 0) {
-          news.push(...parsed);
-        } else {
+        if (parsed.length === 0) {
           console.error(feed.name + ": 所有方式均失败");
         }
-      }
+        return parsed;
+      };
+
+      const results = await Promise.all(allFeeds.map(fetchOne));
+      const news = results.flat();
+      const successCount = news.length > 0 ? new Set(news.map(n => n.source)).size : 0;
 
       news.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
       Storage.setNews(news);
       Storage.setLastFetch(Date.now());
       UI.updateStats();
       UI.updateNewsList();
-      statusEl.textContent = "✅ 抓取完成: " + successCount + "/" + allFeeds.length + "个源, " + news.length + "条";
+      statusEl.textContent = "✅ 抓取完成: " + successCount + "个源, " + news.length + "条";
       Utils.notify("抓取完成", "获取 " + news.length + " 条新闻");
     }
   };
