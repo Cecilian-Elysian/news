@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.2.6
+// @version      2.2.7
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -132,23 +132,38 @@
         const doc = new DOMParser().parseFromString(html, "text/html");
         // 移除脚本和样式
         doc.querySelectorAll("script,style,nav,header,footer,.ad,.advertisement,[class*='comment'],[id*='comment']").forEach(el => el.remove());
-        // 尝试获取 article 或 main 标签内容
-        let content = doc.querySelector("article")?.textContent?.trim();
-        if (!content) content = doc.querySelector("main")?.textContent?.trim();
-        if (!content) content = doc.querySelector(".content")?.textContent?.trim();
-        if (!content) content = doc.querySelector("#content")?.textContent?.trim();
+        // 尝试多种选择器
+        const selectors = [
+          "article", "main", "[class*='content']", "[class*='article']", "[class*='post']",
+          "#content", "#article", "#post-content", ".entry-content", ".post-content"
+        ];
+        let content = null;
+        for (const sel of selectors) {
+          const el = doc.querySelector(sel);
+          if (el && el.textContent.trim().length > 50) {
+            content = el.textContent.trim();
+            console.log("找到内容元素:", sel, "长度:", content.length);
+            break;
+          }
+        }
         // 获取第一段有意义的文字
         if (!content) {
           const paragraphs = doc.querySelectorAll("p");
-          paragraphs.forEach(p => { if (p.textContent.trim().length > 50 && !content) content = p.textContent.trim(); });
+          paragraphs.forEach(p => { if (p.textContent.trim().length > 100 && !content) content = p.textContent.trim(); });
         }
-        if (content && content.length > 100) {
-          content = content.substring(0, 500);
-          if (content.length > 100) content = content.substring(0, content.lastIndexOf("。") + 1) || content;
+        if (content && content.length > 50) {
+          content = content.substring(0, 800);
+          // 在句号处截断
+          const lastDot = content.lastIndexOf("。");
+          if (lastDot > 200) content = content.substring(0, lastDot + 1);
           return content;
         }
+        console.log("未能提取正文:", link);
         return null;
-      } catch (e) { return null; }
+      } catch (e) {
+        console.warn("获取正文失败:", link, e.message);
+        return null;
+      }
     },
     notify: (title, text) => GM_notification({ title, text, silent: true })
   };
@@ -379,17 +394,17 @@
           md += "### " + src + " (" + items.length + "条)\n\n";
           for (const n of items) {
             md += "- **" + n.title + "**\n";
+            md += "  - 来源: " + n.source + " | " + (n.date || "无日期") + "\n";
             if (n.link && n.link !== "#") {
-              md += "  - 🔄 正在获取摘要...";
               const content = await Utils.fetchArticleContent(n.link);
               if (content) {
-                md = md.slice(0, -6) + "\n  - 📄 " + content + "\n";
+                md += "  - 📄 " + content + "\n";
                 totalWithContent++;
               } else {
-                md = md.slice(0, -6) + "\n  - 🔗 " + n.link + "\n";
+                md += "  - 🔗 [查看原文](" + n.link + ")\n";
               }
             }
-            md += "  - 来源: " + n.source + " | " + (n.date || "无日期") + "\n\n";
+            md += "\n";
           }
         }
         md += "---\n\n*📝 含文章摘要模式 | 热门精选，共含" + totalWithContent + "条摘要*\n";
