@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.2.5
+// @version      2.2.6
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -333,7 +333,7 @@
   };
 
   const Reporter = {
-    generate: async (fetchContent = false) => {
+    generate: async (mode = "title") => {
       const news = Storage.getNews();
       if (!news.length) {
         UI.getStatusEl().textContent = "⚠️ 请先抓取新闻";
@@ -341,35 +341,59 @@
         return;
       }
 
-      const top = [...news].sort((a, b) => (Config.PRIORITY[b.source] || 5) - (Config.PRIORITY[a.source] || 5)).slice(0, 3);
       const dateStr = Utils.formatDateStr();
       const folder = Storage.getFolder();
+      let md = "";
 
-      let md = "# 📰 今日新闻日报\n\n> " + dateStr + " | 共" + news.length + "条\n\n---\n\n## 📌 重点关注\n\n";
-      for (let i = 0; i < top.length; i++) {
-        const n = top[i];
-        md += (i + 1) + ". **" + n.title + "**\n   - " + n.source + " | " + (n.date || "无日期");
-        if (fetchContent && n.link && n.link !== "#") {
-          const content = await Utils.fetchArticleContent(n.link);
-          if (content) md += "\n   - 📄 " + content;
-        }
-        md += "\n\n";
-      }
-      md += "---\n\n## 📋 全部新闻\n\n";
-
-      const grouped = {};
-      news.forEach(item => {
-        if (!grouped[item.source]) grouped[item.source] = [];
-        grouped[item.source].push(item);
-      });
-
-      Object.keys(grouped).sort().forEach(src => {
-        md += "### " + src + " (" + grouped[src].length + ")\n\n";
-        grouped[src].forEach(n => {
-          md += "- [" + n.title + "](" + (n.link || "#") + ")\n";
+      if (mode === "title") {
+        // 模式一：仅标题，全部新闻
+        md = "# 📰 今日新闻日报\n\n> " + dateStr + " | 共" + news.length + "条\n\n---\n\n## 📋 全部新闻\n\n";
+        const grouped = {};
+        news.forEach(item => {
+          if (!grouped[item.source]) grouped[item.source] = [];
+          grouped[item.source].push(item);
         });
-        md += "\n";
-      });
+        Object.keys(grouped).sort().forEach(src => {
+          md += "### " + src + " (" + grouped[src].length + ")\n\n";
+          grouped[src].forEach(n => {
+            md += "- [" + n.title + "](" + (n.link || "#") + ")\n";
+          });
+          md += "\n";
+        });
+      } else if (mode === "content") {
+        // 模式二：带摘要，每个源最多3条
+        md = "# 📰 今日新闻日报\n\n> " + dateStr + " | 共" + news.length + "条\n\n---\n\n## 📌 热门精选（各源Top3）\n\n";
+        const grouped = {};
+        news.forEach(item => {
+          if (!grouped[item.source]) grouped[item.source] = [];
+          grouped[item.source].push(item);
+        });
+        const sortedSources = Object.keys(grouped).sort((a, b) => {
+          const pa = Config.PRIORITY[a] || 5;
+          const pb = Config.PRIORITY[b] || 5;
+          return pb - pa;
+        });
+        let totalWithContent = 0;
+        for (const src of sortedSources) {
+          const items = grouped[src].slice(0, 3);
+          md += "### " + src + " (" + items.length + "条)\n\n";
+          for (const n of items) {
+            md += "- **" + n.title + "**\n";
+            if (n.link && n.link !== "#") {
+              md += "  - 🔄 正在获取摘要...";
+              const content = await Utils.fetchArticleContent(n.link);
+              if (content) {
+                md = md.slice(0, -6) + "\n  - 📄 " + content + "\n";
+                totalWithContent++;
+              } else {
+                md = md.slice(0, -6) + "\n  - 🔗 " + n.link + "\n";
+              }
+            }
+            md += "  - 来源: " + n.source + " | " + (n.date || "无日期") + "\n\n";
+          }
+        }
+        md += "---\n\n*📝 含文章摘要模式 | 热门精选，共含" + totalWithContent + "条摘要*\n";
+      }
 
       md += "\n---\n*由新闻爬取器自动生成*\n";
 
@@ -546,8 +570,8 @@
           <div class="nc-btn-group">
             <button class="nc-btn nc-btn-primary" id="nc-start">🚀 一键抓取并生成日报</button>
             <button class="nc-btn" id="nc-fetch">🔄 仅抓取新闻</button>
-            <button class="nc-btn" id="nc-report">📑 仅生成日报</button>
-            <button class="nc-btn" id="nc-report-content">📝 含文章摘要</button>
+            <button class="nc-btn" id="nc-report">📋 仅标题模式</button>
+            <button class="nc-btn" id="nc-report-content">📝 摘要模式</button>
           </div>
           <div class="nc-section">
             <h3 class="nc-section-title">📋 最新新闻 <span id="nc-list-count"></span></h3>
@@ -592,10 +616,14 @@
         e.status.textContent = "✅ 全部完成!";
       });
       e.fetch.addEventListener("click", async () => { await Fetcher.fetchAll(); });
-      e.report.addEventListener("click", async () => { await Reporter.generate(); });
+      e.report.addEventListener("click", async () => {
+        e.status.textContent = "📋 正在生成标题模式日报...";
+        await Reporter.generate("title");
+        e.status.textContent = "✅ 日报已导出";
+      });
       e.reportContent.addEventListener("click", async () => {
         e.status.textContent = "📝 正在获取文章摘要，请稍候...";
-        await Reporter.generate(true);
+        await Reporter.generate("content");
         e.status.textContent = "✅ 日报已导出";
       });
       e.settings.addEventListener("click", () => UI.showSettingsModal());
