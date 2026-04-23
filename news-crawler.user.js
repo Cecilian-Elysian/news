@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.2.4
+// @version      2.2.5
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -124,6 +124,31 @@
           ontimeout: () => reject(new Error("请求超时"))
         });
       });
+    },
+    fetchArticleContent: async (link, retries = 1) => {
+      if (!link || link === "#" || !link.startsWith("http")) return null;
+      try {
+        const html = await Utils.httpReq(link);
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        // 移除脚本和样式
+        doc.querySelectorAll("script,style,nav,header,footer,.ad,.advertisement,[class*='comment'],[id*='comment']").forEach(el => el.remove());
+        // 尝试获取 article 或 main 标签内容
+        let content = doc.querySelector("article")?.textContent?.trim();
+        if (!content) content = doc.querySelector("main")?.textContent?.trim();
+        if (!content) content = doc.querySelector(".content")?.textContent?.trim();
+        if (!content) content = doc.querySelector("#content")?.textContent?.trim();
+        // 获取第一段有意义的文字
+        if (!content) {
+          const paragraphs = doc.querySelectorAll("p");
+          paragraphs.forEach(p => { if (p.textContent.trim().length > 50 && !content) content = p.textContent.trim(); });
+        }
+        if (content && content.length > 100) {
+          content = content.substring(0, 500);
+          if (content.length > 100) content = content.substring(0, content.lastIndexOf("。") + 1) || content;
+          return content;
+        }
+        return null;
+      } catch (e) { return null; }
     },
     notify: (title, text) => GM_notification({ title, text, silent: true })
   };
@@ -308,7 +333,7 @@
   };
 
   const Reporter = {
-    generate: async () => {
+    generate: async (fetchContent = false) => {
       const news = Storage.getNews();
       if (!news.length) {
         UI.getStatusEl().textContent = "⚠️ 请先抓取新闻";
@@ -321,9 +346,15 @@
       const folder = Storage.getFolder();
 
       let md = "# 📰 今日新闻日报\n\n> " + dateStr + " | 共" + news.length + "条\n\n---\n\n## 📌 重点关注\n\n";
-      top.forEach((n, i) => {
-        md += (i + 1) + ". **" + n.title + "**\n   - " + n.source + " | " + (n.date || "无日期") + "\n\n";
-      });
+      for (let i = 0; i < top.length; i++) {
+        const n = top[i];
+        md += (i + 1) + ". **" + n.title + "**\n   - " + n.source + " | " + (n.date || "无日期");
+        if (fetchContent && n.link && n.link !== "#") {
+          const content = await Utils.fetchArticleContent(n.link);
+          if (content) md += "\n   - 📄 " + content;
+        }
+        md += "\n\n";
+      }
       md += "---\n\n## 📋 全部新闻\n\n";
 
       const grouped = {};
@@ -516,6 +547,7 @@
             <button class="nc-btn nc-btn-primary" id="nc-start">🚀 一键抓取并生成日报</button>
             <button class="nc-btn" id="nc-fetch">🔄 仅抓取新闻</button>
             <button class="nc-btn" id="nc-report">📑 仅生成日报</button>
+            <button class="nc-btn" id="nc-report-content">📝 含文章摘要</button>
           </div>
           <div class="nc-section">
             <h3 class="nc-section-title">📋 最新新闻 <span id="nc-list-count"></span></h3>
@@ -543,6 +575,7 @@
         start: UI.sidebar.querySelector("#nc-start"),
         fetch: UI.sidebar.querySelector("#nc-fetch"),
         report: UI.sidebar.querySelector("#nc-report"),
+        reportContent: UI.sidebar.querySelector("#nc-report-content"),
         settings: UI.sidebar.querySelector("#nc-settings"),
         close: UI.sidebar.querySelector("#nc-close"),
         opMinus: UI.sidebar.querySelector("#nc-op-minus"),
@@ -560,6 +593,11 @@
       });
       e.fetch.addEventListener("click", async () => { await Fetcher.fetchAll(); });
       e.report.addEventListener("click", async () => { await Reporter.generate(); });
+      e.reportContent.addEventListener("click", async () => {
+        e.status.textContent = "📝 正在获取文章摘要，请稍候...";
+        await Reporter.generate(true);
+        e.status.textContent = "✅ 日报已导出";
+      });
       e.settings.addEventListener("click", () => UI.showSettingsModal());
       e.close.addEventListener("click", () => UI.sidebar.style.display = "none");
       e.opMinus.addEventListener("click", () => UI.changeOpacity(-10));
