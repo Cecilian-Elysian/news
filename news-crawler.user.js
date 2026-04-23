@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         新闻爬取器
 // @namespace    https://github.com/Cecilian-Elysian/news
-// @version      2.2.3
+// @version      2.2.4
 // @description  一键抓取新闻、自动生成日报并导出
 // @author       Cecilian-Elysian
 // @match        *://*/*
@@ -454,6 +454,7 @@
         .nc-float-btn:hover{transform:scale(1.1);box-shadow:0 8px 28px rgba(102,126,234,.5)}
         .nc-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:2147483647;display:none;align-items:center;justify-content:center}
         .nc-modal-overlay.active{display:flex}
+        .nc-dark.nc-modal-overlay{background:rgba(0,0,0,.7)}
         .nc-modal{background:#fff;border-radius:14px;padding:24px;width:90%;max-width:380px;font-family:inherit;transition:background .3s,color .3s}
         .nc-modal h3{margin:0 0 16px;font-size:16px;color:#333;transition:color .3s}
         .nc-modal input,.nc-modal select{width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;font-family:inherit;background:#fff;color:#333;transition:all .3s}
@@ -656,6 +657,7 @@
 
     showAddModal: () => {
       const overlay = GM_addElement("div", { class: "nc-modal-overlay" });
+      if (State.darkMode) overlay.classList.add("nc-dark");
       overlay.innerHTML = `
         <div class="nc-modal">
           <h3>➕ 添加新闻源</h3>
@@ -694,6 +696,7 @@
     showManageModal: () => {
       const feeds = Storage.getCustomFeeds();
       const overlay = GM_addElement("div", { class: "nc-modal-overlay" });
+      if (State.darkMode) overlay.classList.add("nc-dark");
       let html = '<div class="nc-modal"><h3>⚙️ 管理新闻源</h3><div style="max-height:300px;overflow-y:auto;margin-bottom:12px">';
       feeds.forEach((f, i) => {
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;font-size:12px">';
@@ -720,6 +723,7 @@
 
     showFolderModal: () => {
       const overlay = GM_addElement("div", { class: "nc-modal-overlay" });
+      if (State.darkMode) overlay.classList.add("nc-dark");
       const folderName = Storage.get("downloadFolder") || "";
       overlay.innerHTML = `
         <div class="nc-modal">
@@ -771,6 +775,7 @@
 
     showClearModal: () => {
       const overlay = GM_addElement("div", { class: "nc-modal-overlay" });
+      if (State.darkMode) overlay.classList.add("nc-dark");
       overlay.innerHTML = `
         <div class="nc-modal">
           <h3>🗑️ 清空数据</h3>
@@ -798,6 +803,7 @@
 
     showSettingsModal: () => {
       const overlay = GM_addElement("div", { class: "nc-modal-overlay" });
+      if (State.darkMode) overlay.classList.add("nc-dark");
       overlay.innerHTML = `
         <div class="nc-modal" style="max-width:420px">
           <h3>⚙️ 设置</h3>
