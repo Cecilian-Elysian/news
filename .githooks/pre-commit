@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# 获取当前版本号
+VERSION=$(grep -o '// @version.*' news-crawler.user.js | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+
+# 分割版本号并递增
+IFS='.' read -r major minor patch <<< "$VERSION"
+patch=$((patch + 1))
+NEW_VERSION="${major}.${minor}.${patch}"
+
+# 更新版本号
+sed -i "s|// @version.*|// @version      ${NEW_VERSION}|" news-crawler.user.js
+
+# 自动暂存更改
+git add news-crawler.user.js
